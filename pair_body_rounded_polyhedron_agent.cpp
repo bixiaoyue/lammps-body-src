@@ -1196,6 +1196,7 @@ int PairBodyRoundedPolyhedronAgent::interaction_edge_to_edge(int ibody,
    return interact;
   }
 
+
   // include the vertices for interactions
   // printf("%d %d %d %d");
   if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1 &&

@@ -185,7 +185,7 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn)
    compute surface damping force and torque for cell-substrate interaction
 ------------------------------------------------------------------------- */
 
-my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, double nu_1)
+my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, double nu_1, double A)
 {
 	double x = cell_1->get_x();
 	double y = cell_1->get_y();
@@ -280,7 +280,7 @@ double contact_area_density(Cell *cell_1, double rr)
    needed to be translated to moment in space fixed frame
 ------------------------------------------------------------------------- */
 
-void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double **f, double **torque, double kn, double ct, int shift_flag)
+void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double **f, double **torque, double kn, double cn, double ct, int shift_flag)
 {
 	my6Vec force_and_torque = cell_surface_gforce(cell, kn);
 	double cell_force[3] = {force_and_torque.x, force_and_torque.y, force_and_torque.z};
@@ -305,8 +305,9 @@ void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double 
 	torque[ibody][2] += cell_torque[2];
 
 	// compute surface damping force and momentum
-	double nu_1 = ct;
-	my6Vec damping = compute_surface_damping_force(cell, v, omega, nu_1);
+	double nu_1 = cn;
+	double A = ct;
+	my6Vec damping = compute_surface_damping_force(cell, v, omega, nu_1, A);
 
 	f[ibody][0] += damping.x;
 	f[ibody][1] += damping.y;

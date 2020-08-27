@@ -359,7 +359,7 @@ class Cell {
 
 // workhourse function in fix_wall_body_polyhedron_agent.cpp
 // returns the reaction force and torque of cell-surface interaction
-my6Vec cell_surface_gforce(Cell* cell_1, double kn);
+my6Vec cell_surface_gforce(Cell* cell_1, double kn, double A);
 
 // returns the damping force and torque of cell-surface interaction
 my6Vec compute_surface_damping_force(Cell* cell_1, double* v, double* omega, double nu_1);
@@ -368,7 +368,7 @@ my6Vec compute_surface_damping_force(Cell* cell_1, double* v, double* omega, dou
 double contact_area_density(Cell* cell_1, double rr);
 
 // kernel function in fix_wall_body_polyhedron_agent.cpp
-void contact_forces_new(int ibody, Cell* cell, double* v, double* omega, double** f, double** torque, double kn, double ct, int shift_flag);
+void contact_forces_new(int ibody, Cell* cell, double* v, double* omega, double** f, double** torque, double kn, double cn, double ct, int shift_flag);
 
 // shift a vector by given flag
 void shift_vector(double* v, int n, int flag);

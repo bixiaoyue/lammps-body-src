@@ -64,6 +64,7 @@ class FixNVEBodyAgent : public FixNVE {
   void grow_all_body(double given_growth_ratio = 0);
   void proliferate_all_body();
   void add_noise(double* f, double* mom, double noise_level);
+  bool is_vertical(int ibody);
 };
 
 }

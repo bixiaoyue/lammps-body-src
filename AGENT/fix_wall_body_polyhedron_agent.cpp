@@ -73,7 +73,7 @@ FixWallBodyPolyhedronAgent::FixWallBodyPolyhedronAgent(LAMMPS *lmp, int narg, ch
   kn = force->numeric(FLERR,arg[3]);
 
   c_n = force->numeric(FLERR,arg[4]);
-  if (strcmp(arg[5],"NULL") == 0) c_t = 0.5 * c_n;
+  if (strcmp(arg[5],"NULL") == 0) c_t = 1e-4 * c_n;
   else c_t = force->numeric(FLERR,arg[5]);
 
   if (kn < 0.0 || c_n < 0.0 || c_t < 0.0)
@@ -680,7 +680,7 @@ int FixWallBodyPolyhedronAgent::compute_distance_to_wall(int ibody, int edge_ind
     // contact_forces(ibody, j_a, xpi1, hi, delx, dely, delz,
     //                fx, fy, fz, x, v, angmom, f, torque, vwall);
     if (force_flag == 0) {
-      contact_forces_new(ibody, &cell, v[ibody], omega, f, torque, kn, c_n, shift_flag);
+      contact_forces_new(ibody, &cell, v[ibody], omega, f, torque, kn, c_n, c_t, shift_flag);
       force_flag = 1;
     }
     discrete[ifirst+npi1][6] = 1;
@@ -719,7 +719,7 @@ int FixWallBodyPolyhedronAgent::compute_distance_to_wall(int ibody, int edge_ind
     // contact_forces(ibody, j_a, xpi2, hi, delx, dely, delz,
     //                fx, fy, fz, x, v, angmom, f, torque, vwall);
     if (force_flag == 0) {
-      contact_forces_new(ibody, &cell, v[ibody], omega, f, torque, kn, c_n, shift_flag);
+      contact_forces_new(ibody, &cell, v[ibody], omega, f, torque, kn, c_n, c_t, shift_flag);
       force_flag = 1;
     }
     discrete[ifirst+npi2][6] = 1;

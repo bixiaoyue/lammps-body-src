@@ -37,7 +37,7 @@ using namespace FixConst;
 
 FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp, narg, arg)
 {
-  if (narg != 3 && narg != 6 && narg != 8 && narg != 10)
+  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12)
     error->all(FLERR, "Invalid fix nve/body/agent command");
 
   // looking for args for body growth and proliferation
@@ -58,6 +58,10 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     if (strcmp(arg[i], "damp") == 0)
     {
       nu_0 = force->numeric(FLERR, arg[i + 1]);
+    }
+    if (strcmp(arg[i], "noise") == 0)
+    {
+      noise_level = force->numeric(FLERR, arg[i + 1]);
     }
   }
 
@@ -145,6 +149,8 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
       add_noise(f[i], torque[i], noise_level);
 
+      if (is_vertical(i)) printf("cell %d is vertical! \n", i);
+
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];
       v[i][2] += dtfm * f[i][2];
@@ -163,6 +169,11 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
       // returns new normalized quaternion
 
       MathExtra::mq_to_omega(angmom[i], quat, inertia, omega);
+
+      // adding random noise to force vector and moment vector
+
+      // add_noise(v[i], omega, noise_level);
+
       MathExtra::richardson(quat, angmom[i], omega, inertia, dtq);
     }
 }
@@ -415,6 +426,10 @@ void FixNVEBodyAgent::proliferate_all_body()
             x[new_body_index][j] = x_old[j] + c2[j];
           }
 
+          // int p = new_body_index;
+          // printf("mother cell %d: length %e, center %e %e %e \n", i, length(bonus[body[i]].dvalue), x[i][0], x[i][1], x[i][2]);
+          // printf("daughter cell %d: length %e, center %e %e %e \n", p, length(bonus[body[p]].dvalue), x[p][0], x[p][1], x[p][2]);
+
           // generate new random growth rate
           list_growth_rate[new_body_index] = distribution(generator);
         }
@@ -434,20 +449,39 @@ void FixNVEBodyAgent::proliferate_all_body()
   Adding noise to force vector and moment vector
 ---------------------------------------------------------------------- */
 
-void FixNVEBodyAgent::add_noise(double* f, double* mom, double noise_level)
+void FixNVEBodyAgent::add_noise(double *f, double *mom, double noise_level)
 {
-  noise_level = 1e-8;
-
   // printf("noise: %e\n" ,noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5) );
 
   // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
 
-  f[0] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
-  f[1] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
-  f[2] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
-  mom[0] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
-  mom[1] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
-  mom[2] += noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5);
+  f[0] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  f[1] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  f[2] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[0] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[1] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[2] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
 
   // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
+}
+
+/* ----------------------------------------------------------------------
+  Adding noise to force vector and moment vector
+---------------------------------------------------------------------- */
+
+bool FixNVEBodyAgent::is_vertical(int ibody)
+{
+  AtomVecBody::Bonus *bonus = avec->bonus;
+  double *coords = avec->bonus[ibody].dvalue;
+
+  double L = length(coords);
+  double nz = (coords[5] - coords[2]) / L;
+  if (nz * nz > 0.25)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
 }
