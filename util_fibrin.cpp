@@ -45,7 +45,7 @@ Cell::Cell(double mx, double my, double mz, double mnx, double mny, double mnz, 
 
 vector<Cell *> cells;
 
-my6Vec cell_surface_gforce(Cell *cell_1, double kn)
+my6Vec cell_surface_gforce(Cell *cell_1, double kn, double A)
 {
 	// Return the surface torque acting on cell 1
 
@@ -54,7 +54,7 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn)
 	double E_1 = kn;
 	double E_2 = E_1;
 
-	double A_1 = E_1 / 300;
+	double A_1 = A;
 	double A_2 = A_1;
 
 	double rix = cell_1->get_x();
@@ -172,7 +172,9 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn)
 	}
 	else
 	{
-		cout << "ERROR: Torque is below the ground!" << endl;
+		// cout << "ERROR: Torque is below the ground!" << endl;
+		F.nz += 1;
+		F.z += 1;
 		return F;
 	}
 
@@ -182,10 +184,83 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn)
 }
 
 /* ----------------------------------------------------------------------
+   if cell is in contact with z=0 plane, return 1
+------------------------------------------------------------------------- */
+
+int cell_contact(Cell* cell_1) {
+	// Determine if the cell is reorienting
+
+	double t;
+
+	double nzi = cell_1->get_nz();
+	if (nzi < -1) {
+		nzi = -1;
+	}
+	if (nzi > 1) {
+		nzi = 1;
+	}
+
+	if (nzi > 0) {
+		t = asin(nzi);
+	} else {
+		t = asin(-nzi);
+	}
+
+	if (t == 0) {
+		t = 1e-10;
+	}
+
+	double l = cell_1->get_l();
+	double z = cell_1->get_z();
+
+	double h1 = z + l*nzi/2.0;
+	double h2 = z - l*nzi/2.0;
+
+	if (h1 > h2) {
+		h1 = h2;
+	}
+
+	//cout << "h1: " << h1 << endl;
+
+	if (h1 > R) {
+		//cout << "h1 - R: " << h1 - R << endl;
+		// No contact
+		return 0;
+	} else if (h1 > (R - l*sin(t))) {
+		// Partial contact
+		return 1;
+	} else if (h1 > 0) {
+		// Full contact
+		return 1;
+	} else {
+		// Below ground
+		// cout << "Error, below ground in cell contact?" << endl;
+		// return 0;
+		return 1;
+
+	}
+}
+
+/* ----------------------------------------------------------------------
+   if cell->nz >= 0.5, return 1
+------------------------------------------------------------------------- */
+
+int cell_vertical(Cell* cell_1)
+{
+	double nz = cell_1->get_nz();
+	if (abs(nz) >= 0.5)
+	{
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/* ----------------------------------------------------------------------
    compute surface damping force and torque for cell-substrate interaction
 ------------------------------------------------------------------------- */
 
-my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, double nu_1, double A)
+my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, double nu_1)
 {
 	double x = cell_1->get_x();
 	double y = cell_1->get_y();
@@ -213,13 +288,24 @@ my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, dou
 		// nx = -nx; ny = -ny; nz = -nz;
 	}
 
-	if (d1 < 0 || abs(d1) < 1e-6)
+	if (min(d1, d2) < 0 || abs(min(d1, d2)) < 1e-8)
 	{
 		// no contact
 	}
 	else
 	{
 		double fx[5] = {0}, fy[5] = {0}, fz[5] = {0}, mx[5] = {0}, my[5] = {0}, mz[5] = {0};
+		double sin2_theta = pow(nz, 2);
+
+		double rr_0 = 0;
+		if (abs(nz) > 1e-4 )
+		{
+			rr_0 = (R - z) / nz;
+			if (abs(rr_0) >= L/2) {
+				rr_0 = 0;
+			}
+		}
+		if (rr_0 != 0) printf("rr_0 : %e\n", rr_0);
 
 		// printf("omega: %e %e %e\n", omega[0], omega[1], omega[2]);
 		// printf("nx: %f, ny: %f, nz: %f \n", nx, ny, nz);
@@ -236,12 +322,15 @@ my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, dou
 			// printf("mx: %f, my: %f, mz: %f \n", mx[i], my[i], mz[i]);
 		}
 
-		damping.x = gaussian_quadrature(fx, weights, 5);
-		damping.y = gaussian_quadrature(fy, weights, 5);
+		double extra_x = -L * nu_1 / R * M_PI * R * sin2_theta * (v[0] + cross(omega[0], omega[1], omega[2], rr_0 * nx, rr_0 * ny, rr_0 * nz, 0));
+		double extra_y = -L * nu_1 / R * M_PI * R * sin2_theta * (v[1] + cross(omega[0], omega[1], omega[2], rr_0 * nx, rr_0 * ny, rr_0 * nz, 1));
+
+		damping.x = gaussian_quadrature(fx, weights, 5) + extra_x;
+		damping.y = gaussian_quadrature(fy, weights, 5) + extra_y;
 		damping.z = 0;
-		damping.nx = gaussian_quadrature(mx, weights, 5);
-		damping.ny = gaussian_quadrature(my, weights, 5);
-		damping.nz = gaussian_quadrature(mz, weights, 5);
+		damping.nx = gaussian_quadrature(mx, weights, 5) + cross(rr_0*nx, rr_0*ny, rr_0*nz, extra_x, extra_y, 0, 0);
+		damping.ny = gaussian_quadrature(my, weights, 5) + cross(rr_0*nx, rr_0*ny, rr_0*nz, extra_x, extra_y, 0, 1);
+		damping.nz = gaussian_quadrature(mz, weights, 5) + cross(rr_0*nx, rr_0*ny, rr_0*nz, extra_x, extra_y, 0, 2);
 
 		// printf("Velocities: %f %f %f %f %f %f \n", v[0], v[1], v[2], omega[0], omega[1], omega[2]);
 		// printf("Forces: %f %f %f %f %f %f\n", damping.x, damping.y, damping.z, damping.nx, damping.ny, damping.nz);
@@ -269,7 +358,7 @@ double contact_area_density(Cell *cell_1, double rr)
 	double delta = R - (z + rr * nz);
 
 	if (delta > 0)
-		return sqrt(R) * cos2_theta * sqrt(delta) + M_PI * R * sin2_theta;
+		return sqrt(R) * cos2_theta * sqrt(delta);
 	else
 		return 0;
 }
@@ -282,7 +371,8 @@ double contact_area_density(Cell *cell_1, double rr)
 
 void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double **f, double **torque, double kn, double cn, double ct, int shift_flag)
 {
-	my6Vec force_and_torque = cell_surface_gforce(cell, kn);
+	double A = ct;
+	my6Vec force_and_torque = cell_surface_gforce(cell, kn, A);
 	double cell_force[3] = {force_and_torque.x, force_and_torque.y, force_and_torque.z};
 
 	shift_vector(cell_force, 3, -shift_flag);
@@ -306,8 +396,7 @@ void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double 
 
 	// compute surface damping force and momentum
 	double nu_1 = cn;
-	double A = ct;
-	my6Vec damping = compute_surface_damping_force(cell, v, omega, nu_1, A);
+	my6Vec damping = compute_surface_damping_force(cell, v, omega, nu_1);
 
 	f[ibody][0] += damping.x;
 	f[ibody][1] += damping.y;

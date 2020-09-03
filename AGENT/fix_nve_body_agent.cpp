@@ -30,6 +30,7 @@
 #include "memory.h"
 #include "error.h"
 
+
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
@@ -37,13 +38,14 @@ using namespace FixConst;
 
 FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp, narg, arg)
 {
-  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12)
+  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14)
     error->all(FLERR, "Invalid fix nve/body/agent command");
 
   // looking for args for body growth and proliferation
   // default values are 0, if 0 is set, proliferation and growth will be skiped
   growth_rate = 0;
   L_critical = 0;
+  del_height = 1e6;
   for (int i = 0; i < narg - 1; i++)
   {
     if (strcmp(arg[i], "grow") == 0)
@@ -62,6 +64,10 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     if (strcmp(arg[i], "noise") == 0)
     {
       noise_level = force->numeric(FLERR, arg[i + 1]);
+    }
+    if (strcmp(arg[i], "zdel") == 0)
+    {
+      del_height = force->numeric(FLERR, arg[i + 1]);
     }
   }
 
@@ -102,6 +108,21 @@ void FixNVEBodyAgent::init()
 
 /* ---------------------------------------------------------------------- */
 
+int FixNVEBodyAgent::setmask()
+{
+  int mask = 0;
+  mask |= INITIAL_INTEGRATE;
+  mask |= FINAL_INTEGRATE;
+  mask |= INITIAL_INTEGRATE_RESPA;
+  mask |= FINAL_INTEGRATE_RESPA;
+
+  mask |= PRE_EXCHANGE;
+
+  return mask;
+}
+
+/* ---------------------------------------------------------------------- */
+
 void FixNVEBodyAgent::initial_integrate(int vflag)
 {
   double dtfm;
@@ -126,10 +147,6 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
   grow_all_body();
 
-  // bodies will proliferate if its length reaches critical value
-
-  proliferate_all_body();
-
   // set timestep here since dt may have changed or come via rRESPA
 
   dtq = 0.5 * dtv;
@@ -147,9 +164,8 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
       // adding random noise to force vector and moment vector
 
+      // add_noise(v[i], omega, noise_level);
       add_noise(f[i], torque[i], noise_level);
-
-      if (is_vertical(i)) printf("cell %d is vertical! \n", i);
 
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];
@@ -170,12 +186,49 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
       MathExtra::mq_to_omega(angmom[i], quat, inertia, omega);
 
-      // adding random noise to force vector and moment vector
-
-      // add_noise(v[i], omega, noise_level);
-
       MathExtra::richardson(quat, angmom[i], omega, inertia, dtq);
     }
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixNVEBodyAgent::pre_exchange()
+{
+  int nlocal = atom->nlocal;
+  double** x = atom->x;
+  int *body = atom->body;
+  int *type = atom->type;
+   AtomVecBody::Bonus *bonus = avec->bonus;
+
+  int i = 0;
+  while (i < atom->nlocal)
+  {
+    double vertices[6];
+    body2space(bonus[body[i]].dvalue, bonus[body[i]].quat, vertices);
+    double L = length(bonus[body[i]].dvalue);
+    double nx = (vertices[3] - vertices[0]) / L;
+    double ny = (vertices[4] - vertices[1]) / L;
+    double nz = (vertices[5] - vertices[2]) / L;
+
+    Cell icell = Cell(x[i][0], x[i][1], x[i][2], nx, ny, nz, L);
+
+    if (cell_vertical(&icell))
+    {
+      type[i] = 2;
+    } else {
+      type[i] = 1;
+    }
+
+    if (out_of_z_plane(&icell, del_height))
+    {
+      printf("Cell %d is out of substrate, it will be removed! \n", i);
+      if (true)
+      {
+        avec->deep_copy_body((atom->nlocal)-1, i, true);
+      }
+    }
+    i++;
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -209,8 +262,8 @@ void FixNVEBodyAgent::final_integrate()
       angmom[i][1] += dtf * torque[i][1];
       angmom[i][2] += dtf * torque[i][2];
 
-      // printf("torque: %e\n", torque[i][2]);
-      // printf("angmom of %i: %e \n", i, angmom[i][2]);
+      // cells will proliferate if length > critical length
+      proliferate_all_body();
     }
 }
 
@@ -224,16 +277,17 @@ void FixNVEBodyAgent::apply_damping_force(int ibody, double *omega, double **f, 
   double *v = (atom->v)[ibody];
   int *body = atom->body;
   double L = length(bonus[body[ibody]].dvalue);
+  double R = radius(bonus[body[ibody]].dvalue, 2);
 
   // adding damping force, applying on mass center
-  f[ibody][0] += -nu_0 * L * v[0];
-  f[ibody][1] += -nu_0 * L * v[1];
-  f[ibody][2] += -nu_0 * L * v[2];
+  f[ibody][0] += -nu_0 * (L+4/3*R) * v[0];
+  f[ibody][1] += -nu_0 * (L+4/3*R) * v[1];
+  f[ibody][2] += -nu_0 * (L+4/3*R) * v[2];
 
   // adding damping moment
-  torque[ibody][3] += -1.0 / 6.0 * nu_0 * omega[0] * pow(L, 3);
-  torque[ibody][4] += -1.0 / 6.0 * nu_0 * omega[1] * pow(L, 3);
-  torque[ibody][5] += -1.0 / 6.0 * nu_0 * omega[2] * pow(L, 3);
+  torque[ibody][0] += -1.0 / 6.0 * nu_0 * omega[0] * pow(L+4/3*R, 3);
+  torque[ibody][1] += -1.0 / 6.0 * nu_0 * omega[1] * pow(L+4/3*R, 3);
+  torque[ibody][2] += -1.0 / 6.0 * nu_0 * omega[2] * pow(L+4/3*R, 3);
 
   // printf("fx: %f, fy: %f, fz: %f \n", f[ibody][0], f[ibody][1], f[ibody][2]);
 }
@@ -279,7 +333,7 @@ void FixNVEBodyAgent::grow_single_body(int ibody, double growth_rate)
     bonus[body[ibody]].dvalue[j] *= length_ratio; // coords of vertices (in body frame)
   rmass[ibody] *= growth_ratio;                   // mass ~ V
   for (int j = 0; j < 3; j++)
-    bonus[body[ibody]].inertia[j] *= growth_ratio * pow(length_ratio, 2); // rotational inertia ~ m*L^2
+    bonus[body[ibody]].inertia[j] *= pow(growth_ratio, 3); // rotational inertia ~ m*L^2
 }
 
 /* ----------------------------------------------------------------------
@@ -319,6 +373,18 @@ double FixNVEBodyAgent::volume(double r, double L)
 {
   double pi = 3.1415926;
   return 4 / 3 * pi * pow(r, 3) + pi * pow(r, 2) * L;
+}
+
+/* ----------------------------------------------------------------------
+  if the cell is not in contact with z=height plane, return true
+---------------------------------------------------------------------- */
+
+bool FixNVEBodyAgent::out_of_z_plane(Cell* icell, double height)
+{
+  double relative_z = icell->get_z() - height;
+  icell->set_z(relative_z);
+
+  return !cell_contact(icell);
 }
 
 /* ----------------------------------------------------------------------
@@ -411,14 +477,23 @@ void FixNVEBodyAgent::proliferate_all_body()
           translate_single_body(i, c1);
           for (int j = 0; j < 6; j++)
             bonus[body[i]].dvalue[j] *= prolif_ratio;
-          rmass[i] *= prolif_ratio + extra_ratio;
+          rmass[i] *= 0.55;
           for (int j = 0; j < 3; j++)
-            bonus[body[i]].inertia[j] *= pow(prolif_ratio + extra_ratio, 3);
+          {
+            bonus[body[i]].inertia[j] *= pow(0.55, 3);
+            angmom[i][j] *= pow(0.5, 3);
+          }
 
           // insert the second daughter body
 
           avec->add_body(i);
           int new_body_index = atom->nlocal - 1; // append the new cell to the last
+
+          printf("body array: ");
+          for (int i = 0; i < atom->nlocal; i++) {
+            printf("%d ", body[i]);
+          }
+          printf("\n");
 
           // update the second center
           for (int j = 0; j < 3; j++)
@@ -426,9 +501,13 @@ void FixNVEBodyAgent::proliferate_all_body()
             x[new_body_index][j] = x_old[j] + c2[j];
           }
 
-          // int p = new_body_index;
-          // printf("mother cell %d: length %e, center %e %e %e \n", i, length(bonus[body[i]].dvalue), x[i][0], x[i][1], x[i][2]);
-          // printf("daughter cell %d: length %e, center %e %e %e \n", p, length(bonus[body[p]].dvalue), x[p][0], x[p][1], x[p][2]);
+          set_force(new_body_index, 0, 0, 0, 0, 0, 0);
+
+          int p = new_body_index;
+          // printf("mother cell %d: length %e, center %e %e %e, mass %e, inertia %e %e %e \n", i, length(bonus[body[i]].dvalue), x[i][0], x[i][1], x[i][2], rmass[i], bonus[body[i]].inertia[0], bonus[body[i]].inertia[1], bonus[body[i]].inertia[2]);
+          // printf("mother force: %e %e %e %e %e %e \n", atom->f[i][0], atom->f[i][1], atom->f[i][2], atom->torque[i][0], atom->torque[i][1], atom->torque[i][2]);
+          printf("daughter cell %d: dindex: %d, iindex: %d, length %e, center %e %e %e, mass %e, inertia %e %e %e \n", p, bonus[body[p]].dindex, bonus[body[p]].iindex, length(bonus[body[p]].dvalue), x[p][0], x[p][1], x[p][2], rmass[i], bonus[body[i]].inertia[0], bonus[body[i]].inertia[1], bonus[body[i]].inertia[2]);
+          // printf("daughter force: %e %e %e %e %e %e \n", atom->f[p][0], atom->f[p][1], atom->f[p][2], atom->torque[p][0], atom->torque[p][1], atom->torque[p][2]);
 
           // generate new random growth rate
           list_growth_rate[new_body_index] = distribution(generator);
@@ -449,39 +528,29 @@ void FixNVEBodyAgent::proliferate_all_body()
   Adding noise to force vector and moment vector
 ---------------------------------------------------------------------- */
 
-void FixNVEBodyAgent::add_noise(double *f, double *mom, double noise_level)
+void FixNVEBodyAgent::add_noise(double *f, double *mom, double given_noise_level)
 {
-  // printf("noise: %e\n" ,noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5) );
-
-  // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
-
-  f[0] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-  f[1] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-  f[2] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-  mom[0] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-  mom[1] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-  mom[2] += noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-
-  // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
+  f[0] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  f[1] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  f[2] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[0] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[1] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
+  mom[2] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
 }
 
 /* ----------------------------------------------------------------------
   Adding noise to force vector and moment vector
 ---------------------------------------------------------------------- */
 
-bool FixNVEBodyAgent::is_vertical(int ibody)
+void FixNVEBodyAgent::set_force(int ibody, double fx, double fy, double fz, double tx, double ty, double tz)
 {
-  AtomVecBody::Bonus *bonus = avec->bonus;
-  double *coords = avec->bonus[ibody].dvalue;
+  double* f = atom->f[ibody];
+  double *torque = atom->torque[ibody];
 
-  double L = length(coords);
-  double nz = (coords[5] - coords[2]) / L;
-  if (nz * nz > 0.25)
-  {
-    return true;
-  }
-  else
-  {
-    return false;
-  }
+  f[0] = fx;
+  f[1] = fy;
+  f[2] = fz;
+  torque[0] = tx;
+  torque[1] = ty;
+  torque[2] = tz;
 }

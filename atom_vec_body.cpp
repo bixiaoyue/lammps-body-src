@@ -235,6 +235,9 @@ void AtomVecBody::copy_bonus(int i, int j)
    end of array
 ------------------------------------------------------------------------- */
 
+// Note: Here is a little bit memory waste, to make coding more easier and safer
+// The unused dcp and icp pointers are not freed
+
 void AtomVecBody::add_body(int i)
 {
   if (atom->nlocal + atom->nghost + 1 >= nmax) grow(0);
@@ -247,7 +250,6 @@ void AtomVecBody::add_body(int i)
   deep_copy_body(atom->nlocal, atom->nlocal + atom->nghost);
   // Then: copy the atom i to the position of that ghost atom
   deep_copy_body(i, atom->nlocal);
-  Bonus *newbody = &bonus[nlocal_bonus];
 
   atom->nlocal++;
   nlocal_bonus++;
@@ -255,9 +257,10 @@ void AtomVecBody::add_body(int i)
 
 /* ----------------------------------------------------------------------
    deep copy body i to body j
+   assuming body[i] and body[j] both linked to proper bonus position
 ------------------------------------------------------------------------- */
 
-void AtomVecBody::deep_copy_body(int i, int j)
+void AtomVecBody::deep_copy_body(int i, int j, int delflag)
 {
   tag[j] = tag[i];
   type[j] = type[i];
@@ -278,13 +281,14 @@ void AtomVecBody::deep_copy_body(int i, int j)
 
   int ibonus = body[i];
   int jbonus = body[j];
-  memcpy(&bonus[jbonus],&bonus[ibonus],sizeof(Bonus)); // swallow copy
-  bonus[jbonus].ivalue = icp->get(bonus[jbonus].ninteger, bonus[jbonus].iindex);
-  bonus[jbonus].dvalue = dcp->get(bonus[jbonus].ndouble, bonus[jbonus].dindex);
+  deep_copy_bonus(ibonus, jbonus);
   check_pools();
-  for (int k = 0; k < bonus[jbonus].ninteger; k++) bonus[jbonus].ivalue[k] = bonus[ibonus].ivalue[k];
-  for (int k = 0; k < bonus[jbonus].ndouble; k++) bonus[jbonus].dvalue[k] = bonus[ibonus].dvalue[k];
   bonus[jbonus].ilocal = j;
+
+  if (delflag)
+  {
+    atom->nlocal--;
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -293,11 +297,33 @@ void AtomVecBody::deep_copy_body(int i, int j)
 
 void AtomVecBody::setup_bonus(int i, int ibody)
 {
-  memcpy(&bonus[i], &bonus[0], sizeof(Bonus));
-  bonus[i].ivalue = icp->get(bonus[i].iindex);
-  bonus[i].dvalue = dcp->get(bonus[i].ndouble, bonus[i].dindex);
+  deep_copy_bonus(0, i);
   check_pools();
   bonus[i].ilocal = ibody;
+}
+
+/* ----------------------------------------------------------------------
+   deep copy bonus[ibonus] to bonus[jbonus]
+   leaving ilocal of bonus[jbonus] unchanged
+------------------------------------------------------------------------- */
+
+void AtomVecBody::deep_copy_bonus(int ibonus, int jbonus)
+{
+  bonus[jbonus].ninteger = bonus[ibonus].ninteger;
+  bonus[jbonus].ndouble = bonus[ibonus].ndouble;
+  bonus[jbonus].ilocal = bonus[ibonus].ilocal;
+  for (int i = 0; i < 4; i++)
+  {
+    bonus[jbonus].quat[i] = bonus[ibonus].quat[i];
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    bonus[jbonus].inertia[i] = bonus[ibonus].inertia[i];
+  }
+  bonus[jbonus].ivalue = icp->get(bonus[jbonus].ninteger, bonus[jbonus].iindex);
+  bonus[jbonus].dvalue = dcp->get(bonus[jbonus].ndouble, bonus[jbonus].dindex);
+  for (int k = 0; k < bonus[jbonus].ninteger; k++) bonus[jbonus].ivalue[k] = bonus[ibonus].ivalue[k];
+  for (int k = 0; k < bonus[jbonus].ndouble; k++) bonus[jbonus].dvalue[k] = bonus[ibonus].dvalue[k];
 }
 
 /* ----------------------------------------------------------------------

@@ -100,8 +100,9 @@ class AtomVecBody : public AtomVec {
   // methods used in class FixNVEBodyAgent, add a body copied from body[i]
 
   void add_body(int);
-  void deep_copy_body(int, int);
+  void deep_copy_body(int i, int j, int delflag=0);
   void setup_bonus(int, int);
+  void deep_copy_bonus(int ibonus, int jbonus);
   void check_pools();
 
  private:

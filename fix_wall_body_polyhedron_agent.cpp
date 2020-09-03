@@ -671,7 +671,7 @@ int FixWallBodyPolyhedronAgent::compute_distance_to_wall(int ibody, int edge_ind
     delz = xpi1[2] - hi[2];
     R = d1 - rounded_radius_i;
 
-    fpair = -kn * R;
+    fpair = -kn * sqrt(-R) * R;
 
     fx = delx*fpair/d1;
     fy = dely*fpair/d1;
@@ -710,7 +710,7 @@ int FixWallBodyPolyhedronAgent::compute_distance_to_wall(int ibody, int edge_ind
     delz = xpi2[2] - hi[2];
     R = d2 - rounded_radius_i;
 
-    fpair = -kn * R;
+    fpair = -kn * sqrt(-R) * R;
 
     fx = delx*fpair/d2;
     fy = dely*fpair/d2;

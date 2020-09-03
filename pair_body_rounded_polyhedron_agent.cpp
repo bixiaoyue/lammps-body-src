@@ -1189,18 +1189,18 @@ int PairBodyRoundedPolyhedronAgent::interaction_edge_to_edge(int ibody,
   interact = EE_NONE;
 
   // singularity case, ignore interactions
+  // add artificial torques to make two body seperate
 
-  if (r < EPSILON) {
-   printf("warning: contact singularity, ignoring interactions! ibody = %d, jbody = %d\n", ibody, jbody);
-   printf("center i = [%f %f %f], center j = [%f %f %f]\n", xmi[0], xmi[1], xmi[2], xmj[0], xmj[1], xmj[2]);
-   return interact;
-  }
+  // if (r < EPSILON) {
+  //  printf("warning: contact singularity, ignoring interactions! ibody = %d, jbody = %d\n", ibody, jbody);
+  //  printf("center i = [%f %f %f], center j = [%f %f %f]\n", xmi[0], xmi[1], xmi[2], xmj[0], xmj[1], xmj[2]);
+  //  return interact;
+  // }
 
 
   // include the vertices for interactions
   // printf("%d %d %d %d");
-  if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1 &&
-      r < contact_dist + cut_inner) {
+  if (r < contact_dist + cut_inner) {
     pair_force_and_torque(jbody, ibody, h1, h2, r, contact_dist,
                           jtype, itype, x, v, f, torque, angmom,
                           jflag, energy, facc);
@@ -1504,7 +1504,14 @@ void PairBodyRoundedPolyhedronAgent::pair_force_and_torque(int ibody, int jbody,
   delx = pi[0] - pj[0];
   dely = pi[1] - pj[1];
   delz = pi[2] - pj[2];
+
   R = r - contact_dist;
+
+  // in case of singularity
+  if ((pow(delx, 2) + pow(dely, 2) + pow(delz, 2)) < 1e-10) {
+    delz = 1e-2;
+    r = 1e-2;
+  }
 
   kernel_force(R, itype, jtype, energy, fpair);
 

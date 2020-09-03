@@ -29,6 +29,8 @@ FixStyle(nve/body/agent,FixNVEBodyAgent)
 #include <vector>
 #include "fix_nve.h"
 
+#include "util_fibrin.h"
+
 
 namespace LAMMPS_NS {
 
@@ -36,8 +38,11 @@ class FixNVEBodyAgent : public FixNVE {
  public:
   FixNVEBodyAgent(class LAMMPS *, int, char **);
   void init();
+  int setmask();
   void initial_integrate(int);
+  void pre_exchange();
   void final_integrate();
+
 
  private:
   double dtq;                    // timestep
@@ -46,6 +51,7 @@ class FixNVEBodyAgent : public FixNVE {
   double L_critical;             // critical length for proliferation
   double nu_0;                   // damping constant of ambient environments
 
+  double del_height;              // if a cell is above z=del_height plane, then delete it
   double noise_level;            // pre-defined noise level applying on both force and moment vector
 
   std::default_random_engine generator;
@@ -60,11 +66,12 @@ class FixNVEBodyAgent : public FixNVE {
   double length(double* coords);
   double radius(double* data, int i);
   double volume(double r, double L);
+  bool out_of_z_plane(Cell* icell, double height);
   double* rot_inertia(double r, double L, double* mom);
   void grow_all_body(double given_growth_ratio = 0);
   void proliferate_all_body();
   void add_noise(double* f, double* mom, double noise_level);
-  bool is_vertical(int ibody);
+  void set_force(int ibody, double fx, double fy, double fz, double tx, double ty, double tz);
 };
 
 }

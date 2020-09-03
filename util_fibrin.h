@@ -361,6 +361,12 @@ class Cell {
 // returns the reaction force and torque of cell-surface interaction
 my6Vec cell_surface_gforce(Cell* cell_1, double kn, double A);
 
+// see if the cell is in contact with z=0 plane
+int cell_contact(Cell* cell_1);
+
+// see if the cell is verticalized
+int cell_vertical(Cell* cell_1);
+
 // returns the damping force and torque of cell-surface interaction
 my6Vec compute_surface_damping_force(Cell* cell_1, double* v, double* omega, double nu_1);
 

@@ -61,9 +61,9 @@ BodyRoundedPolyhedron::BodyRoundedPolyhedron(LAMMPS *lmp, int narg, char **arg) 
 
   // NOTE: need to set appropriate nnbin param for dcp
 
-  icp = new MyPoolChunk<int>(1,3);
+  icp = new MyPoolChunk<int>(1,3,1,10240);
   dcp = new MyPoolChunk<double>(3*nmin+2+1+1,
-                                3*nmax+2*nmax+MAX_FACE_SIZE*nmax+1+1);
+                                3*nmax+2*nmax+MAX_FACE_SIZE*nmax+1+1,1,10240);
 
   memory->create(imflag,2*nmax,"body/rounded/polyhedron:imflag");
   memory->create(imdata,2*nmax,7,"body/polyhedron:imdata");
@@ -136,7 +136,7 @@ double BodyRoundedPolyhedron::enclosing_radius(struct AtomVecBody::Bonus *bonus)
   int nvertices = bonus->ivalue[0];
   if (nvertices == 1 || nvertices == 2)
   	return *(bonus->dvalue+3*nsub(bonus)+2);
-  return *(bonus->dvalue+3*nsub(bonus) + 2*nedges(bonus) + 
+  return *(bonus->dvalue+3*nsub(bonus) + 2*nedges(bonus) +
            MAX_FACE_SIZE*nfaces(bonus));
 }
 
@@ -147,7 +147,7 @@ double BodyRoundedPolyhedron::rounded_radius(struct AtomVecBody::Bonus *bonus)
   int nvertices = bonus->ivalue[0];
   if (nvertices == 1 || nvertices == 2)
     return *(bonus->dvalue+3*nsub(bonus)+2+1);
-  return *(bonus->dvalue+3*nsub(bonus) + 2*nedges(bonus) + 
+  return *(bonus->dvalue+3*nsub(bonus) + 2*nedges(bonus) +
            MAX_FACE_SIZE*nfaces(bonus)+1);
 }
 
@@ -155,7 +155,7 @@ double BodyRoundedPolyhedron::rounded_radius(struct AtomVecBody::Bonus *bonus)
 
 double BodyRoundedPolyhedron::length_rod(struct AtomVecBody::Bonus *bonus) {
   double *p = bonus->dvalue;
-  double L = sqrt( pow(p[3]-p[0],2) + pow(p[4]-p[1],2) + pow(p[5]-p[2],2) ); 
+  double L = sqrt( pow(p[3]-p[0],2) + pow(p[4]-p[1],2) + pow(p[5]-p[2],2) );
   return L;
 }
 
@@ -219,7 +219,7 @@ void BodyRoundedPolyhedron::data_body(int ibonus, int ninteger, int ndouble,
   // nsub == 1 || nsub == 2 || nsub == 3:
   //   6 for inertia + 3*nsub for vertex coords + 1 for rounded radius
   // nsub > 3:
-  //   6 for inertia + 3*nsub for vertex coords + 2*nsub for edges + 
+  //   6 for inertia + 3*nsub for vertex coords + 2*nsub for edges +
   //   3*nfaces + 1 for rounded radius
 
   int nedges,nentries;
@@ -339,7 +339,7 @@ void BodyRoundedPolyhedron::data_body(int ibonus, int ninteger, int ndouble,
       bonus->dvalue[k] = 0;
       *(&bonus->dvalue[k]+1) = 1;
       k += 2;
-    }    
+    }
 
     erad = sqrt(erad2);
     bonus->dvalue[k] = erad;
@@ -419,7 +419,7 @@ double BodyRoundedPolyhedron::radius_body(int ninteger, int ndouble,
   double maxrad = 0.0;
   double delta[3];
 
-  int offset = 6;          
+  int offset = 6;
   for (int i = 0; i < nsub; i++) {
     delta[0] = dfile[offset];
     delta[1] = dfile[offset+1];
@@ -432,7 +432,7 @@ double BodyRoundedPolyhedron::radius_body(int ninteger, int ndouble,
   if (nsub > 2) offset += (2*nedges+MAX_FACE_SIZE*nfac);
 
   // add in radius of rounded corners
-  
+
   return maxrad + 0.5*dfile[offset];
 }
 
