@@ -325,8 +325,8 @@ void FixNVEBodyAgent::grow_single_body(int ibody, double growth_rate)
 
   // dL/L = alpha * (4/3*R + L)/L * dt
   // dV/V = alpha * dt
-  double length_ratio = 1 + dtf * growth_rate * (4.0 / 3.0 * r + L) / L;
-  double growth_ratio = 1 + dtf * growth_rate;
+  double length_ratio = 1 + 2 * dtf * growth_rate * (4.0 / 3.0 * r + L) / L;
+  double growth_ratio = 1 + 2 * dtf * growth_rate;
 
   // update the coords of vertices, mass, rotation inertia
   for (int j = 0; j < 6; j++)

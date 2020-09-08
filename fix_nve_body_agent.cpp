@@ -325,8 +325,8 @@ void FixNVEBodyAgent::grow_single_body(int ibody, double growth_rate)
 
   // dL/L = alpha * (4/3*R + L)/L * dt
   // dV/V = alpha * dt
-  double length_ratio = 1 + dtf * growth_rate * (4.0 / 3.0 * r + L) / L;
-  double growth_ratio = 1 + dtf * growth_rate;
+  double length_ratio = 1 + 2 * dtf * growth_rate * (4.0 / 3.0 * r + L) / L;
+  double growth_ratio = 1 + 2 * dtf * growth_rate;
 
   // update the coords of vertices, mass, rotation inertia
   for (int j = 0; j < 6; j++)
@@ -530,18 +530,12 @@ void FixNVEBodyAgent::proliferate_all_body()
 
 void FixNVEBodyAgent::add_noise(double *f, double *mom, double given_noise_level)
 {
-  // printf("noise: %e\n" ,noise_level * (rand()/(static_cast<double>(RAND_MAX)) - 0.5) );
-
-  // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
-
   f[0] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
   f[1] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
   f[2] += 0 * noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
   mom[0] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
   mom[1] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
   mom[2] += given_noise_level * (rand() / (static_cast<double>(RAND_MAX)) - 0.5);
-
-  // printf("fx: %e, fy: %e, fz: %e, mx: %e, my: %e, mz: %e \n", f[0], f[1], f[2], mom[0], mom[1], mom[2]);
 }
 
 /* ----------------------------------------------------------------------
