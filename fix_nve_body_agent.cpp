@@ -94,6 +94,8 @@ void FixNVEBodyAgent::init()
   list_growth_rate = std::vector<double>(nlocal * 2, 0);
 
   for (int i = 0; i < nlocal; i++)
+  {
+    list_growth_rate[i] = distribution(generator); // initiate all rates, including gel particles
     if (mask[i] & groupbit)
     {
       if (body[i] < 0)
@@ -102,6 +104,7 @@ void FixNVEBodyAgent::init()
       }
       list_growth_rate[i] = distribution(generator);
     }
+  }
 
   FixNVE::init();
 }
@@ -203,6 +206,8 @@ void FixNVEBodyAgent::pre_exchange()
   int i = 0;
   while (i < atom->nlocal)
   {
+    if (atom->mask[i] & groupbit)
+    {
     double vertices[6];
     body2space(bonus[body[i]].dvalue, bonus[body[i]].quat, vertices);
     double L = length(bonus[body[i]].dvalue);
@@ -226,6 +231,7 @@ void FixNVEBodyAgent::pre_exchange()
       {
         avec->deep_copy_body((atom->nlocal)-1, i, true);
       }
+    }
     }
     i++;
   }
@@ -489,11 +495,11 @@ void FixNVEBodyAgent::proliferate_all_body()
           avec->add_body(i);
           int new_body_index = atom->nlocal - 1; // append the new cell to the last
 
-          printf("body array: ");
-          for (int i = 0; i < atom->nlocal; i++) {
-            printf("%d ", body[i]);
-          }
-          printf("\n");
+          // printf("body array: ");
+          // for (int i = 0; i < atom->nlocal; i++) {
+          //   printf("%d ", body[i]);
+          // }
+          // printf("\n");
 
           // update the second center
           for (int j = 0; j < 3; j++)
@@ -506,7 +512,7 @@ void FixNVEBodyAgent::proliferate_all_body()
           int p = new_body_index;
           // printf("mother cell %d: length %e, center %e %e %e, mass %e, inertia %e %e %e \n", i, length(bonus[body[i]].dvalue), x[i][0], x[i][1], x[i][2], rmass[i], bonus[body[i]].inertia[0], bonus[body[i]].inertia[1], bonus[body[i]].inertia[2]);
           // printf("mother force: %e %e %e %e %e %e \n", atom->f[i][0], atom->f[i][1], atom->f[i][2], atom->torque[i][0], atom->torque[i][1], atom->torque[i][2]);
-          printf("daughter cell %d: dindex: %d, iindex: %d, length %e, center %e %e %e, mass %e, inertia %e %e %e \n", p, bonus[body[p]].dindex, bonus[body[p]].iindex, length(bonus[body[p]].dvalue), x[p][0], x[p][1], x[p][2], rmass[i], bonus[body[i]].inertia[0], bonus[body[i]].inertia[1], bonus[body[i]].inertia[2]);
+          // printf("daughter cell %d: dindex: %d, iindex: %d, length %e, center %e %e %e, mass %e, inertia %e %e %e \n", p, bonus[body[p]].dindex, bonus[body[p]].iindex, length(bonus[body[p]].dvalue), x[p][0], x[p][1], x[p][2], rmass[i], bonus[body[i]].inertia[0], bonus[body[i]].inertia[1], bonus[body[i]].inertia[2]);
           // printf("daughter force: %e %e %e %e %e %e \n", atom->f[p][0], atom->f[p][1], atom->f[p][2], atom->torque[p][0], atom->torque[p][1], atom->torque[p][2]);
 
           // generate new random growth rate
