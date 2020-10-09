@@ -101,7 +101,7 @@ class AtomVecBody : public AtomVec {
 
   void add_body(int);
   void deep_copy_body(int i, int j, int delflag=0);
-  void setup_bonus(int, int);
+  void setup_bonus(int, int, int);
   void deep_copy_bonus(int ibonus, int jbonus);
   void check_pools();
 

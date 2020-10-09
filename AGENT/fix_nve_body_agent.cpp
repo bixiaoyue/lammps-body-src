@@ -201,7 +201,7 @@ void FixNVEBodyAgent::pre_exchange()
   double** x = atom->x;
   int *body = atom->body;
   int *type = atom->type;
-   AtomVecBody::Bonus *bonus = avec->bonus;
+  AtomVecBody::Bonus *bonus = avec->bonus;
 
   // change cell color(type), delete cell if cell is detached from substrate
   int i = 0;

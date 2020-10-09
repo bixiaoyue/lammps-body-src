@@ -246,7 +246,8 @@ void AtomVecBody::add_body(int i)
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector
   body[atom->nlocal + atom->nghost] = nlocal_bonus + nghost_bonus;
-  setup_bonus(nlocal_bonus + nghost_bonus, atom->nlocal + atom->nghost);
+  setup_bonus(i, nlocal_bonus + nghost_bonus, atom->nlocal + atom->nghost);
+  // printf("nghost_bonus is: %d\n", nghost_bonus);
   deep_copy_body(atom->nlocal, atom->nlocal + atom->nghost);
   // Then: copy the atom i to the position of that ghost atom
   deep_copy_body(i, atom->nlocal);
@@ -296,9 +297,9 @@ void AtomVecBody::deep_copy_body(int i, int j, int delflag)
    set up an uninitiated bonus
 ------------------------------------------------------------------------- */
 
-void AtomVecBody::setup_bonus(int i, int ibody)
+void AtomVecBody::setup_bonus(int p, int i, int ibody)
 {
-  deep_copy_bonus(0, i);
+  deep_copy_bonus(p, i);
   check_pools();
   bonus[i].ilocal = ibody;
 }
