@@ -2,6 +2,8 @@
 #include "bond_fene_expand.h"
 #include "bond_gromos.h"
 #include "bond_harmonic.h"
+#include "bond_harmonic_shift.h"
+#include "bond_harmonic_shift_cut.h"
 #include "bond_hybrid.h"
 #include "bond_morse.h"
 #include "bond_nonlinear.h"

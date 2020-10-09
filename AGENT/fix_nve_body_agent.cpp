@@ -203,6 +203,7 @@ void FixNVEBodyAgent::pre_exchange()
   int *type = atom->type;
    AtomVecBody::Bonus *bonus = avec->bonus;
 
+  // change cell color(type), delete cell if cell is detached from substrate
   int i = 0;
   while (i < atom->nlocal)
   {
@@ -267,10 +268,10 @@ void FixNVEBodyAgent::final_integrate()
       angmom[i][0] += dtf * torque[i][0];
       angmom[i][1] += dtf * torque[i][1];
       angmom[i][2] += dtf * torque[i][2];
-
-      // cells will proliferate if length > critical length
-      proliferate_all_body();
     }
+
+  // cells will proliferate if length > critical length
+  proliferate_all_body();
 }
 
 /* ----------------------------------------------------------------------
@@ -337,6 +338,7 @@ void FixNVEBodyAgent::grow_single_body(int ibody, double growth_rate)
   // update the coords of vertices, mass, rotation inertia
   for (int j = 0; j < 6; j++)
     bonus[body[ibody]].dvalue[j] *= length_ratio; // coords of vertices (in body frame)
+  bonus[body[ibody]].dvalue[6+2] *= length_ratio; // enclosing radius (not rounded radius)
   rmass[ibody] *= growth_ratio;                   // mass ~ V
   for (int j = 0; j < 3; j++)
     bonus[body[ibody]].inertia[j] *= pow(growth_ratio, 3); // rotational inertia ~ m*L^2
@@ -359,7 +361,7 @@ void FixNVEBodyAgent::translate_single_body(int ibody, double *vec)
 
 double FixNVEBodyAgent::radius(double *data, int nvert)
 {
-  return data[nvert * 3 + 1];
+  return data[nvert * 3 + 2 + 1];
 }
 
 /* ----------------------------------------------------------------------
@@ -483,6 +485,7 @@ void FixNVEBodyAgent::proliferate_all_body()
           translate_single_body(i, c1);
           for (int j = 0; j < 6; j++)
             bonus[body[i]].dvalue[j] *= prolif_ratio;
+          bonus[body[i]].dvalue[6+2] *= 0.5;
           rmass[i] *= 0.55;
           for (int j = 0; j < 3; j++)
           {
@@ -545,7 +548,7 @@ void FixNVEBodyAgent::add_noise(double *f, double *mom, double given_noise_level
 }
 
 /* ----------------------------------------------------------------------
-  Adding noise to force vector and moment vector
+  Manually set force and moment values for given atom
 ---------------------------------------------------------------------- */
 
 void FixNVEBodyAgent::set_force(int ibody, double fx, double fy, double fz, double tx, double ty, double tz)

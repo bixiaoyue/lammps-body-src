@@ -4,7 +4,9 @@ const char * LAMMPS_NS::LAMMPS::installed_packages[] = {
 "ASPHERE",
 "BODY",
 "MANYBODY",
+"MC",
 "MOLECULE",
+"USER-MISC",
 "USER-REAXC",
  NULL };
 #endif

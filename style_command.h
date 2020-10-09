@@ -16,6 +16,8 @@
 #include "reset_ids.h"
 #include "run.h"
 #include "set.h"
+#include "temper_grem.h"
+#include "temper_npt.h"
 #include "velocity.h"
 #include "write_coeff.h"
 #include "write_data.h"
