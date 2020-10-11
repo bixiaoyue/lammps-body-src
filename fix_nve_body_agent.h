@@ -59,6 +59,7 @@ class FixNVEBodyAgent : public FixNVE {
   std::vector<double> list_growth_rate;
 
   class AtomVecBody *avec;
+  class AtomVec *avec_current;
   void apply_damping_force(int, double*, double**, double**);
   void body2space(double*, double*, double*);
   void grow_single_body(int ibody, double growth_ratio);

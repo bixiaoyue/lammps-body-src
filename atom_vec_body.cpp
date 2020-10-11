@@ -240,8 +240,8 @@ void AtomVecBody::copy_bonus(int i, int j)
 
 void AtomVecBody::add_body(int i)
 {
-  if (atom->nlocal + atom->nghost + 1 >= nmax) grow(0);
-  if (nlocal_bonus + nghost_bonus + 1 >= nmax_bonus) grow_bonus();
+  if (atom->nlocal == nmax) grow(0);
+  if (nlocal_bonus + nghost_bonus >= nmax_bonus) grow_bonus();
   int ibonus = body[i];
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector
@@ -319,11 +319,13 @@ void AtomVecBody::deep_copy_bonus(int ibonus, int jbonus)
   bonus[jbonus].ilocal = bonus[ibonus].ilocal;
   for (int i = 0; i < 4; i++)
   {
-    bonus[jbonus].quat[i] = bonus[ibonus].quat[i];
+    if (bonus[jbonus].quat != nullptr) bonus[jbonus].quat[i] = bonus[ibonus].quat[i];
+    else printf("AtomVecBody::deep_copy_bonus(): Warning, NULL ptr for bonus.quat\n");
   }
   for (int i = 0; i < 3; i++)
   {
-    bonus[jbonus].inertia[i] = bonus[ibonus].inertia[i];
+    if (bonus[jbonus].inertia != nullptr) bonus[jbonus].inertia[i] = bonus[ibonus].inertia[i];
+    else printf("AtomVecBody::deep_copy_bonus(): Warning, NULL ptr for bonus.inertia\n");
   }
   bonus[jbonus].ivalue = icp->get(bonus[jbonus].ninteger, bonus[jbonus].iindex);
   bonus[jbonus].dvalue = dcp->get(bonus[jbonus].ndouble, bonus[jbonus].dindex);

@@ -14,7 +14,7 @@ DEPFLAGS =	-M
 
 LINK =		mpicxx -cxx=g++
 LINKFLAGS =	-g -O
-LIB = 
+LIB =
 SIZE =		size
 
 ARCHIVE =	ar
@@ -40,9 +40,9 @@ LMP_INC =	-DLAMMPS_GZIP -DLAMMPS_JPEG
 # PATH = path for MPI library
 # LIB = name of MPI library
 
-MPI_INC =     -I/Users/lichanghao/mpich2-1.4/src/include 
-MPI_PATH =    -L/Users/lichanghao/mpich2-1.4/lib	
-MPI_LIB =	
+MPI_INC =     -I/Users/lichanghao/mpich2-1.4/src/include
+MPI_PATH =    -L/Users/lichanghao/mpich2-1.4/lib
+MPI_LIB =
 
 # FFT library
 # see discussion in Section 2.2 (step 6) of manaul
@@ -51,9 +51,9 @@ MPI_LIB =
 # PATH = path for FFT library
 # LIB = name of FFT library
 
-FFT_INC =    	
-FFT_PATH = 
-FFT_LIB =	
+FFT_INC =
+FFT_PATH =
+FFT_LIB =
 
 # JPEG and/or PNG library
 # see discussion in Section 2.2 (step 7) of manual

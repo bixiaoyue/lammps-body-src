@@ -500,6 +500,7 @@ void FixNVEBodyAgent::proliferate_all_body()
           // insert the second daughter body
 
           avec->add_body(i);
+          atom->avec->grow_reset();
           int new_body_index = atom->nlocal - 1; // append the new cell to the last
 
           // printf("body array: ");
