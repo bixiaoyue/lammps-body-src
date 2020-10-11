@@ -104,6 +104,7 @@ class AtomVecBody : public AtomVec {
   void setup_bonus(int, int, int);
   void deep_copy_bonus(int ibonus, int jbonus);
   void check_pools();
+  void check_bonus();
 
  private:
   tagint *tag;

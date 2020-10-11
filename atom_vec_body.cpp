@@ -246,7 +246,7 @@ void AtomVecBody::add_body(int i)
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector
   body[atom->nlocal + atom->nghost] = nlocal_bonus + nghost_bonus;
-  setup_bonus(i, nlocal_bonus + nghost_bonus, atom->nlocal + atom->nghost);
+  setup_bonus(ibonus, nlocal_bonus + nghost_bonus, atom->nlocal + atom->nghost);
   // printf("nghost_bonus is: %d\n", nghost_bonus);
   deep_copy_body(atom->nlocal, atom->nlocal + atom->nghost);
   // Then: copy the atom i to the position of that ghost atom
@@ -255,6 +255,8 @@ void AtomVecBody::add_body(int i)
   atom->tag[atom->nlocal] = atom->nlocal+1;
   atom->nlocal++;
   nlocal_bonus++;
+
+  check_bonus();
 }
 
 /* ----------------------------------------------------------------------
@@ -300,7 +302,6 @@ void AtomVecBody::deep_copy_body(int i, int j, int delflag)
 void AtomVecBody::setup_bonus(int p, int i, int ibody)
 {
   deep_copy_bonus(p, i);
-  check_pools();
   bonus[i].ilocal = ibody;
 }
 
@@ -311,6 +312,8 @@ void AtomVecBody::setup_bonus(int p, int i, int ibody)
 
 void AtomVecBody::deep_copy_bonus(int ibonus, int jbonus)
 {
+  if (bonus[ibonus].ndouble != 12) printf("AtomVecBody::deep_copy_bonus(): Warning, are you sure this is the right copy? ndouble = %d\n", bonus[ibonus].ndouble);
+
   bonus[jbonus].ninteger = bonus[ibonus].ninteger;
   bonus[jbonus].ndouble = bonus[ibonus].ndouble;
   bonus[jbonus].ilocal = bonus[ibonus].ilocal;
@@ -324,6 +327,7 @@ void AtomVecBody::deep_copy_bonus(int ibonus, int jbonus)
   }
   bonus[jbonus].ivalue = icp->get(bonus[jbonus].ninteger, bonus[jbonus].iindex);
   bonus[jbonus].dvalue = dcp->get(bonus[jbonus].ndouble, bonus[jbonus].dindex);
+  check_pools();
   for (int k = 0; k < bonus[jbonus].ninteger; k++) bonus[jbonus].ivalue[k] = bonus[ibonus].ivalue[k];
   for (int k = 0; k < bonus[jbonus].ndouble; k++) bonus[jbonus].dvalue[k] = bonus[ibonus].dvalue[k];
 }
@@ -336,6 +340,45 @@ void AtomVecBody::check_pools()
 {
   if (icp->errorflag) error->all(FLERR,"Memory allocation error: icp error");
   if (dcp->errorflag) error->all(FLERR,"Memory allocation error: dcp error");
+}
+
+/* ----------------------------------------------------------------------
+   check if bonus data structure works properly
+------------------------------------------------------------------------- */
+
+void AtomVecBody::check_bonus()
+{
+  if (nlocal_bonus != atom->nlocal || nghost_bonus != atom->nghost)
+    printf("nlocal_bonus = %d, nlocal = %d, nghost_bonus = %d, nghost = %d\n", nlocal_bonus, atom->nlocal, nghost_bonus, atom->nghost);
+  for (int i = 0; i < nlocal_bonus; i++)
+  {
+    int ibody = bonus[i].ilocal;
+    if (atom->body[ibody] != i)
+      printf("AtomVecBody::check_bonus(): Warning, body array and bonus array are not connected properly (1), ibody = %d\n", ibody);
+  }
+
+  for (int i = 0; i < atom->nlocal; i++)
+  {
+    int ibonus = body[i];
+    if (bonus[ibonus].ilocal != i)
+      printf("AtomVecBody::check_bonus(): Warning, body array and bonus array are not connected properly (2), ibody = %d\n", i);
+    if (atom->type[i] == 3 && bonus[ibonus].ndouble != 7)
+      printf("AtomVecBody::check_bonus(): Warning, error in bonus array of gel group, ibody = %d\n", i);
+    int nentries = 3*bonus[ibonus].ivalue[0] + 2 + 1;
+    double r = bonus[ibonus].dvalue[nentries];
+    if (r != 1)
+      printf("AtomVecBody::check_bonus(): Warning, radius != 1, radius = %f\n", r);
+  }
+
+  for (int i = 0; i < atom->nlocal; i++)
+  {
+    for (int j = 0; j < atom->nlocal; j++)
+    {
+      if (atom->body[i] == atom->body[j] && i != j)
+        printf("AtomVecBody::check_bonus(): Warning: body array has repeated members\n");
+    }
+  }
+
 }
 
 /* ----------------------------------------------------------------------

@@ -197,11 +197,13 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
 void FixNVEBodyAgent::pre_exchange()
 {
-  int nlocal = atom->nlocal;
   double** x = atom->x;
   int *body = atom->body;
   int *type = atom->type;
   AtomVecBody::Bonus *bonus = avec->bonus;
+  int nlocal = atom->nlocal;
+  if (igroup == atom->firstgroup)
+    nlocal = atom->nfirst;
 
   // change cell color(type), delete cell if cell is detached from substrate
   int i = 0;
@@ -327,6 +329,8 @@ void FixNVEBodyAgent::grow_single_body(int ibody, double growth_rate)
   int *body = atom->body;
   double r = radius(bonus[body[ibody]].dvalue, 2);
   double L = length(bonus[body[ibody]].dvalue);
+
+  if (bonus[body[ibody]].ndouble != 12) {printf("warning: ndouble != 12, herendouble = %d\n", bonus[body[ibody]].ndouble);}
 
   // add Gaussian random noise to growth rate: current sigma = 0.2<alpha>
 
@@ -485,12 +489,12 @@ void FixNVEBodyAgent::proliferate_all_body()
           translate_single_body(i, c1);
           for (int j = 0; j < 6; j++)
             bonus[body[i]].dvalue[j] *= prolif_ratio;
-          bonus[body[i]].dvalue[6+2] *= 0.5;
-          rmass[i] *= 0.55;
+          bonus[body[i]].dvalue[6+2] *= prolif_ratio;
+          rmass[i] *= 0.50;
           for (int j = 0; j < 3; j++)
           {
-            bonus[body[i]].inertia[j] *= pow(0.55, 3);
-            angmom[i][j] *= pow(0.5, 3);
+            bonus[body[i]].inertia[j] *= pow(0.50, 3);
+            angmom[i][j] *= pow(0.50, 3);
           }
 
           // insert the second daughter body
@@ -519,7 +523,10 @@ void FixNVEBodyAgent::proliferate_all_body()
           // printf("daughter force: %e %e %e %e %e %e \n", atom->f[p][0], atom->f[p][1], atom->f[p][2], atom->torque[p][0], atom->torque[p][1], atom->torque[p][2]);
 
           // generate new random growth rate
-          list_growth_rate[new_body_index] = distribution(generator);
+          double new_rate = distribution(generator);
+          if (new_rate > growth_rate + 3*standard_dev) new_rate = growth_rate + 3*standard_dev;
+          if (new_rate < growth_rate - 3*standard_dev) new_rate = growth_rate - 3*standard_dev;
+          list_growth_rate[new_body_index] = new_rate;
         }
       }
     }

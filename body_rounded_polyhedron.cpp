@@ -61,9 +61,9 @@ BodyRoundedPolyhedron::BodyRoundedPolyhedron(LAMMPS *lmp, int narg, char **arg) 
 
   // NOTE: need to set appropriate nnbin param for dcp
 
-  icp = new MyPoolChunk<int>(1,3,1,10240);
+  icp = new MyPoolChunk<int>(1,3,1,102400);
   dcp = new MyPoolChunk<double>(3*nmin+2+1+1,
-                                3*nmax+2*nmax+MAX_FACE_SIZE*nmax+1+1,1,10240);
+                                3*nmax+2*nmax+MAX_FACE_SIZE*nmax+1+1,1,102400);
 
   memory->create(imflag,2*nmax,"body/rounded/polyhedron:imflag");
   memory->create(imdata,2*nmax,7,"body/polyhedron:imdata");
@@ -229,6 +229,7 @@ void BodyRoundedPolyhedron::data_body(int ibonus, int ninteger, int ndouble,
     nedges = ned; //nsub + nfac - 2;
     nentries = 6 + 3*nsub + 2*nedges + MAX_FACE_SIZE*nfac + 1;
   }
+
   if (ndouble != nentries)
     error->one(FLERR,"Incorrect # of floating-point values in "
              "Bodies section of data file");
