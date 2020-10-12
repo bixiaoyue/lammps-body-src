@@ -242,6 +242,7 @@ void AtomVecBody::add_body(int i)
 {
   if (atom->nlocal == nmax) grow(0);
   if (nlocal_bonus + nghost_bonus >= nmax_bonus) grow_bonus();
+  grow_reset();
   int ibonus = body[i];
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector

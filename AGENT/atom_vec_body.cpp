@@ -242,6 +242,7 @@ void AtomVecBody::add_body(int i)
 {
   if (atom->nlocal == nmax) grow(0);
   if (nlocal_bonus + nghost_bonus >= nmax_bonus) grow_bonus();
+  grow_reset();
   int ibonus = body[i];
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector
@@ -312,7 +313,9 @@ void AtomVecBody::setup_bonus(int p, int i, int ibody)
 
 void AtomVecBody::deep_copy_bonus(int ibonus, int jbonus)
 {
-  if (bonus[ibonus].ndouble != 12) printf("AtomVecBody::deep_copy_bonus(): Warning, are you sure this is the right copy? ndouble = %d\n", bonus[ibonus].ndouble);
+  int ibody = bonus[ibonus].ilocal;
+  if (bonus[ibonus].ndouble != 12 && ibody < atom->nlocal)
+    printf("AtomVecBody::deep_copy_bonus(): Warning, are you sure this is the right copy? ndouble = %d\n", bonus[ibonus].ndouble);
 
   bonus[jbonus].ninteger = bonus[ibonus].ninteger;
   bonus[jbonus].ndouble = bonus[ibonus].ndouble;
