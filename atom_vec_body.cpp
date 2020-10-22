@@ -371,7 +371,7 @@ void AtomVecBody::check_bonus()
       printf("AtomVecBody::check_bonus(): Warning, error in bonus array of gel group, ibody = %d\n", i);
     int nentries = 3*bonus[ibonus].ivalue[0] + 2 + 1;
     double r = bonus[ibonus].dvalue[nentries];
-    if (r != 1)
+    if (r != 1 && bonus[ibonus].ivalue[0] == 2)
       printf("AtomVecBody::check_bonus(): Warning, radius != 1, radius = %f\n", r);
   }
 
