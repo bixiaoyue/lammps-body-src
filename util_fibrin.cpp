@@ -174,7 +174,7 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn, double A)
 	{
 		// cout << "ERROR: Torque is below the ground!" << endl;
 		F.nz += 0;
-		F.z += 1;
+		F.z += 0.01;
 		return F;
 	}
 
