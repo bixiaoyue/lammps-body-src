@@ -515,6 +515,7 @@ void FixNVEBodyAgent::proliferate_all_body()
             x[new_body_index][j] = x_old[j] + c2[j];
           }
 
+          set_force(i, 0, 0, 0, 0, 0, 0);
           set_force(new_body_index, 0, 0, 0, 0, 0, 0);
 
           int p = new_body_index;

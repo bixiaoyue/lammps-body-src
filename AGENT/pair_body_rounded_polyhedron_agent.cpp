@@ -1509,6 +1509,7 @@ void PairBodyRoundedPolyhedronAgent::pair_force_and_torque(int ibody, int jbody,
 
   // in case of singularity
   if ((pow(delx, 2) + pow(dely, 2) + pow(delz, 2)) < 1e-10) {
+    printf("Warning: singularity for distance between two bodies\n");
     delz = 1e-2;
     r = 1e-2;
   }
