@@ -29,6 +29,7 @@
 #include "update.h"
 #include "memory.h"
 #include "error.h"
+#include "domain.h"
 
 
 using namespace LAMMPS_NS;
@@ -71,6 +72,8 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     }
   }
 
+  nsteps = 0;
+
   // set up random seed and normal distribution
   srand(time(NULL));
   distribution = std::normal_distribution<double>(growth_rate, standard_dev);
@@ -105,7 +108,6 @@ void FixNVEBodyAgent::init()
       list_growth_rate[i] = distribution(generator);
     }
   }
-
   FixNVE::init();
 }
 
@@ -274,6 +276,8 @@ void FixNVEBodyAgent::final_integrate()
 
   // cells will proliferate if length > critical length
   proliferate_all_body();
+
+  nsteps += 1;
 }
 
 /* ----------------------------------------------------------------------
@@ -403,9 +407,29 @@ bool FixNVEBodyAgent::out_of_z_plane(Cell* icell, double height)
   return the rotational inertia of the body (unfinished)
 ---------------------------------------------------------------------- */
 
-double *rot_inertia(double r, double L, double *mom)
+double FixNVEBodyAgent::*rot_inertia(double r, double L, double *mom)
 {
   return NULL;
+}
+
+/* ----------------------------------------------------------------------
+  see if this cell is freezed so not growing
+---------------------------------------------------------------------- */
+
+bool FixNVEBodyAgent::freeze(int ibody)
+{
+  double *boxlo = domain->boxlo;
+  double *boxhi = domain->boxhi;
+  double center[3] = {(boxlo[0]+boxhi[0])/2, (boxlo[1]+boxhi[1])/2, 0};
+  double *x = atom->x[ibody];
+
+  double R = 8.0;
+  double rsq = pow(x[0]-center[0], 2) + pow(x[1] - center[1], 2);
+  if (sqrt(rsq) < R) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -430,7 +454,9 @@ void FixNVEBodyAgent::grow_all_body(double given_growth_ratio)
       int nvertices = bonus[body[i]].ivalue[0];
       if ((mask[i] & groupbit) && (nvertices == 2))
       {
-        grow_single_body(i, list_growth_rate[i]);
+        double actual_rate = list_growth_rate[i];
+        // if (freeze(i) && nsteps > 5e5) {actual_rate = 0;}
+        grow_single_body(i, actual_rate);
       }
     }
   }

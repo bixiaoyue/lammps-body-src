@@ -253,7 +253,7 @@ void AtomVecBody::add_body(int i)
   // Then: copy the atom i to the position of that ghost atom
   deep_copy_body(i, atom->nlocal);
 
-  atom->tag[atom->nlocal] = atom->natoms+1;
+  atom->tag[atom->nlocal] = atom->natoms+1000+1;
   atom->nlocal++;
   nlocal_bonus++;
 
