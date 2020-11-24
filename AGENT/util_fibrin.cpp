@@ -55,7 +55,7 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn, double A)
 	double E_2 = E_1;
 
 	double A_1 = A;
-	double A_2 = A_1;
+	double A_2 = A_1 * 10;
 
 	double rix = cell_1->get_x();
 	double riy = cell_1->get_y();
@@ -315,6 +315,7 @@ my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, dou
 			fx[i] = -L * nu_1 / R * contact_area_density(cell_1, rr) * (v[0] + cross(omega[0], omega[1], omega[2], rr * nx, rr * ny, rr * nz, 0));
 			fy[i] = -L * nu_1 / R * contact_area_density(cell_1, rr) * (v[1] + cross(omega[0], omega[1], omega[2], rr * nx, rr * ny, rr * nz, 1));
 			fz[i] = 0;
+			// fz[i] = -L * nu_1 / R * (v[2] + cross(omega[0], omega[1], omega[2], rr * nx, rr * ny, rr * nz, 2));
 			// printf("fx: %f, fy: %f \n", fx[i], fy[i]);
 			mx[i] = cross(rr * nx, rr * ny, rr * nz, fx[i], fy[i], fz[i], 0);
 			my[i] = cross(rr * nx, rr * ny, rr * nz, fx[i], fy[i], fz[i], 1);
@@ -322,8 +323,11 @@ my6Vec compute_surface_damping_force(Cell *cell_1, double *v, double *omega, dou
 			// printf("mx: %f, my: %f, mz: %f \n", mx[i], my[i], mz[i]);
 		}
 
+		// if (nz > 0) rr_0 = -L/2;
+		// else rr_0 = L/2;
 		double extra_x = -L * nu_1 / R * M_PI * R * sin2_theta * (v[0] + cross(omega[0], omega[1], omega[2], rr_0 * nx, rr_0 * ny, rr_0 * nz, 0));
 		double extra_y = -L * nu_1 / R * M_PI * R * sin2_theta * (v[1] + cross(omega[0], omega[1], omega[2], rr_0 * nx, rr_0 * ny, rr_0 * nz, 1));
+		double extra_z = -L * nu_1 / R * M_PI * R * sin2_theta * (v[2] + cross(omega[0], omega[1], omega[2], rr_0 * nx, rr_0 * ny, rr_0 * nz, 2));
 
 		damping.x = gaussian_quadrature(fx, weights, 5) + extra_x;
 		damping.y = gaussian_quadrature(fy, weights, 5) + extra_y;
@@ -407,6 +411,34 @@ void contact_forces_new(int ibody, Cell *cell, double *v, double *omega, double 
 
 	// printf("%e %e %e %e %e %e \n", force_and_torque.x, force_and_torque.y, force_and_torque.z, force_and_torque.nx, force_and_torque.ny, force_and_torque.nz);
 	// printf("damping: %e %e %e %e %e %e \n", damping.x, damping.y, damping.z, damping.nx, damping.ny, damping.nz);
+}
+
+/* ----------------------------------------------------------------------
+   keep verticalized cell on the surface
+------------------------------------------------------------------------- */
+
+void keep_verticalized_cell(int ibody, Cell *cell, double **f, double **torque)
+{
+	double x = cell->get_x();
+	double y = cell->get_y();
+	double z = cell->get_z();
+	double nx = cell->get_nx();
+	double ny = cell->get_ny();
+	double nz = cell->get_nz();
+	double L = cell->get_l();
+
+	if (z > R + L/2 + 2) return;
+
+	if (cell_vertical(cell)) {
+		if (nz < 0) {nx = -nx; ny = -ny; nz = -nz;}
+		double z = cell->get_z();
+		double d = R - (z - L/2 * nz);
+		double FF = -1000 * (0.1 - d);
+		f[ibody][3] += FF;
+		torque[ibody][0] += cross(-L/2*nx, -L/2*ny, -L/2*nz, 0, 0, FF, 0);
+		torque[ibody][1] += cross(-L/2*nx, -L/2*ny, -L/2*nz, 0, 0, FF, 1);
+		torque[ibody][2] += cross(-L/2*nx, -L/2*ny, -L/2*nz, 0, 0, FF, 2);
+	}
 }
 
 /* ----------------------------------------------------------------------

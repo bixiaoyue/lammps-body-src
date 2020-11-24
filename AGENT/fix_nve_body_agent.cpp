@@ -39,7 +39,7 @@ using namespace FixConst;
 
 FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp, narg, arg)
 {
-  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14)
+  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14 && narg!= 16)
     error->all(FLERR, "Invalid fix nve/body/agent command");
 
   // looking for args for body growth and proliferation
@@ -47,6 +47,7 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
   growth_rate = 0;
   L_critical = 0;
   del_height = 1e6;
+  frozen_radius = 0;
   for (int i = 0; i < narg - 1; i++)
   {
     if (strcmp(arg[i], "grow") == 0)
@@ -69,6 +70,10 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     if (strcmp(arg[i], "zdel") == 0)
     {
       del_height = force->numeric(FLERR, arg[i + 1]);
+    }
+    if (strcmp(arg[i], "frozen_radius") == 0)
+    {
+      frozen_radius = force->numeric(FLERR, arg[i + 1]);
     }
   }
 
@@ -416,14 +421,13 @@ double FixNVEBodyAgent::*rot_inertia(double r, double L, double *mom)
   see if this cell is freezed so not growing
 ---------------------------------------------------------------------- */
 
-bool FixNVEBodyAgent::freeze(int ibody)
+bool FixNVEBodyAgent::freeze(int ibody, double R)
 {
   double *boxlo = domain->boxlo;
   double *boxhi = domain->boxhi;
   double center[3] = {(boxlo[0]+boxhi[0])/2, (boxlo[1]+boxhi[1])/2, 0};
   double *x = atom->x[ibody];
 
-  double R = 8.0;
   double rsq = pow(x[0]-center[0], 2) + pow(x[1] - center[1], 2);
   if (sqrt(rsq) < R) {
     return true;
@@ -449,16 +453,18 @@ void FixNVEBodyAgent::grow_all_body(double given_growth_ratio)
 
   if (growth_rate != 0)
   {
+    int n_freeze = 0;
     for (int i = 0; i < nlocal; i++)
     {
       int nvertices = bonus[body[i]].ivalue[0];
       if ((mask[i] & groupbit) && (nvertices == 2))
       {
         double actual_rate = list_growth_rate[i];
-        // if (freeze(i) && nsteps > 5e5) {actual_rate = 0;}
+        if (frozen_radius > 0 && freeze(i, frozen_radius) && nsteps > 6.5e5) {actual_rate = 0; n_freeze += 1;}
         grow_single_body(i, actual_rate);
       }
     }
+    if (n_freeze != 0 && nsteps % 50000 == 0) printf("Number of freezed = %d\n", n_freeze);
   }
 }
 

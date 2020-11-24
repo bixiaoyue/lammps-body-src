@@ -52,6 +52,7 @@ class FixNVEBodyAgent : public FixNVE {
   double nu_0;                   // damping constant of ambient environments
 
   double del_height;             // if a cell is above z=del_height plane, then delete it
+  double frozen_radius;          // radius of the frozen area (cell can move but not grow)
   double noise_level;            // pre-defined noise level applying on both force and moment vector
 
   int nsteps;                    // recording current timestep
@@ -74,8 +75,9 @@ class FixNVEBodyAgent : public FixNVE {
   void grow_all_body(double given_growth_ratio = 0);
   void proliferate_all_body();
   void add_noise(double* f, double* mom, double noise_level);
+  void add_tension(double* f, double* mom, double A);
   void set_force(int ibody, double fx, double fy, double fz, double tx, double ty, double tz);
-  bool freeze(int ibody);
+  bool freeze(int ibody, double R);
 };
 
 }

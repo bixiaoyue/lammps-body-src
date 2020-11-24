@@ -663,6 +663,8 @@ int FixWallBodyPolyhedronAgent::compute_distance_to_wall(int ibody, int edge_ind
   double *quat = bonus[body[ibody]].quat;
   MathExtra::mq_to_omega(angmom[ibody], quat, inertia, omega);
 
+  // keep_verticalized_cell(ibody, &cell, f, torque);
+
   distance(hi, xpi1, d1);
 
   if (d1 <= rounded_radius_i && static_cast<int>(discrete[ifirst+npi1][6]) == 0) {
