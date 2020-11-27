@@ -55,7 +55,7 @@ my6Vec cell_surface_gforce(Cell *cell_1, double kn, double A)
 	double E_2 = E_1;
 
 	double A_1 = A;
-	double A_2 = A_1 * 10;
+	double A_2 = A_1 * 1;
 
 	double rix = cell_1->get_x();
 	double riy = cell_1->get_y();
