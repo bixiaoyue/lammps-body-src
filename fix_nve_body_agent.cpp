@@ -39,7 +39,7 @@ using namespace FixConst;
 
 FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp, narg, arg)
 {
-  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14 && narg!= 16)
+  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14 && narg!= 16 && narg!= 18)
     error->all(FLERR, "Invalid fix nve/body/agent command");
 
   // looking for args for body growth and proliferation
@@ -48,6 +48,7 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
   L_critical = 0;
   del_height = 1e6;
   frozen_radius = 0;
+  m_radial = 0.1;
   for (int i = 0; i < narg - 1; i++)
   {
     if (strcmp(arg[i], "grow") == 0)
@@ -74,6 +75,10 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     if (strcmp(arg[i], "frozen_radius") == 0)
     {
       frozen_radius = force->numeric(FLERR, arg[i + 1]);
+    }
+    if (strcmp(arg[i], "M") == 0)
+    {
+      m_radial = force->numeric(FLERR, arg[i + 1]);
     }
   }
 
@@ -177,7 +182,7 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
       // add_noise(v[i], omega, noise_level);
       add_noise(f[i], torque[i], noise_level);
 
-      radial_moment(i, 1);
+      radial_moment(i, m_radial);
 
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];

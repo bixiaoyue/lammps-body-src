@@ -53,6 +53,7 @@ class FixNVEBodyAgent : public FixNVE {
 
   double del_height;             // if a cell is above z=del_height plane, then delete it
   double frozen_radius;          // radius of the frozen area (cell can move but not grow)
+  double m_radial;               // keep radial alignments
   double noise_level;            // pre-defined noise level applying on both force and moment vector
 
   int nsteps;                    // recording current timestep
