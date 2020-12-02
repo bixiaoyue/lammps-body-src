@@ -177,6 +177,8 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
       // add_noise(v[i], omega, noise_level);
       add_noise(f[i], torque[i], noise_level);
 
+      radial_moment(i, 1);
+
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];
       v[i][2] += dtfm * f[i][2];
@@ -415,6 +417,43 @@ bool FixNVEBodyAgent::out_of_z_plane(Cell* icell, double height)
 double FixNVEBodyAgent::*rot_inertia(double r, double L, double *mom)
 {
   return NULL;
+}
+
+/* ----------------------------------------------------------------------
+  see if this cell is freezed so not growing
+---------------------------------------------------------------------- */
+
+void FixNVEBodyAgent::radial_moment(int ibody, double M)
+{
+  double *boxlo = domain->boxlo;
+  double *boxhi = domain->boxhi;
+  double center[3] = {(boxlo[0]+boxhi[0])/2, (boxlo[1]+boxhi[1])/2, 0};
+  double *x = atom->x[ibody];
+  AtomVecBody::Bonus *bonus = avec->bonus;
+  int *body = atom->body;
+  double **torque = atom->torque;
+
+  double L = length(bonus[body[ibody]].dvalue);
+  double temp[6];
+  for (int j = 0; j < 6; j++)
+    temp[j] = bonus[body[ibody]].dvalue[j];
+  double cc[6];
+  body2space(temp, bonus[body[ibody]].quat, cc);
+  double nx = cc[3] - cc[0];
+  double ny = cc[4] - cc[1];
+  double nz = cc[5] - cc[2];
+
+  double xvec[3] = {0};
+  for (int i = 0; i < 3; i++) xvec[i] = x[i] - center[i];
+
+  double r_n_dot = xvec[0]*nx + xvec[1]*ny + xvec[2]*nz;
+  if (r_n_dot < 0) {nx = -nx; ny = -ny; nz = -nz;}
+
+  double mz = M * cross(nx, ny, 0, xvec[0], xvec[1], 0, 2);
+  torque[ibody][2] += mz;
+
+  // if (nsteps % 50000 == 0) printf("mz = %f", mz);
+
 }
 
 /* ----------------------------------------------------------------------
