@@ -182,7 +182,7 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
       // add_noise(v[i], omega, noise_level);
       add_noise(f[i], torque[i], noise_level);
 
-      radial_moment(i, m_radial);
+      if (nsteps > 3e5) radial_moment(i, m_radial);
 
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];
@@ -454,7 +454,8 @@ void FixNVEBodyAgent::radial_moment(int ibody, double M)
   double r_n_dot = xvec[0]*nx + xvec[1]*ny + xvec[2]*nz;
   if (r_n_dot < 0) {nx = -nx; ny = -ny; nz = -nz;}
 
-  double mz = M * cross(nx, ny, 0, xvec[0], xvec[1], 0, 2);
+  double rr = sqrt(xvec[0]*xvec[0] +  xvec[1]*xvec[1]);
+  double mz = M * cross(nx, ny, 0, xvec[0], xvec[1], 0, 2) / (rr*rr);
   torque[ibody][2] += mz;
 
   // if (nsteps % 50000 == 0) printf("mz = %f", mz);
@@ -504,7 +505,7 @@ void FixNVEBodyAgent::grow_all_body(double given_growth_ratio)
       if ((mask[i] & groupbit) && (nvertices == 2))
       {
         double actual_rate = list_growth_rate[i];
-        if (frozen_radius > 0 && freeze(i, frozen_radius) && nsteps > 6.5e5) {actual_rate = 0; n_freeze += 1;}
+        if (frozen_radius > 0 && freeze(i, frozen_radius) && nsteps > 3e5) {actual_rate = 0; n_freeze += 1;}
         grow_single_body(i, actual_rate);
       }
     }
