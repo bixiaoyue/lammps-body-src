@@ -54,9 +54,12 @@ class FixNVEBodyAgent : public FixNVE {
   double del_height;             // if a cell is above z=del_height plane, then delete it
   double frozen_radius;          // radius of the frozen area (cell can move but not grow)
   double m_radial;               // keep radial alignments
+  double mutant_fraction;         // fraction of mutant (zero friction) cell
   double noise_level;            // pre-defined noise level applying on both force and moment vector
 
   int nsteps;                    // recording current timestep
+
+  double element[4][2] = {{2, 2}, {-2, 2}, {-2, -2}, {2, -2}};
 
   std::default_random_engine generator;
   std::normal_distribution<double> distribution;
@@ -72,6 +75,7 @@ class FixNVEBodyAgent : public FixNVE {
   double radius(double* data, int i);
   double volume(double r, double L);
   bool out_of_z_plane(Cell* icell, double height);
+  bool need_reneighbor();
   double* rot_inertia(double r, double L, double* mom);
   void grow_all_body(double given_growth_ratio = 0);
   void proliferate_all_body();
@@ -80,6 +84,11 @@ class FixNVEBodyAgent : public FixNVE {
   void set_force(int ibody, double fx, double fy, double fz, double tx, double ty, double tz);
   bool freeze(int ibody, double R);
   void radial_moment(int ibody, double M);
+
+  // benchmarking
+  void deform_single_element_tensile(double element[][2], double* r1, double* r2, double* c1, double* c2, double dl);
+  void apply_gel_cell_adhesion(double* f, double *torque, double* r1, double* r2, double* c1, double* c2);
+  void apply_hypothetical_confinements(int ibody, double R, double H);
 };
 
 }

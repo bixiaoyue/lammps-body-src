@@ -231,6 +231,21 @@ void AtomVecBody::copy_bonus(int i, int j)
 }
 
 /* ----------------------------------------------------------------------
+   Find maximum id in the whole system, stored in AtomVecBody::maxtag_all
+------------------------------------------------------------------------- */
+
+void AtomVecBody::find_maxid()
+{
+  tagint *tag = atom->tag;
+  tagint *molecule = atom->molecule;
+  int nlocal = atom->nlocal;
+
+  tagint max = 0;
+  for (int i = 0; i < nlocal; i++) max = MAX(max,tag[i]);
+  MPI_Allreduce(&max,&maxtag_all,1,MPI_LMP_TAGINT,MPI_MAX,world);
+}
+
+/* ----------------------------------------------------------------------
    add a body copied from body[i], the location of the new body is in the
    end of array
 ------------------------------------------------------------------------- */
@@ -247,14 +262,16 @@ void AtomVecBody::add_body(int i)
   // deal with ghost bodies
   // First: copy the first ghost atom to final position of atom vector
   body[atom->nlocal + atom->nghost] = nlocal_bonus + nghost_bonus;
+  // printf("nghost = %d, nghost_bonus = %d\n", atom->nghost, nghost_bonus);
   setup_bonus(ibonus, nlocal_bonus + nghost_bonus, atom->nlocal + atom->nghost);
-  // printf("nghost_bonus is: %d\n", nghost_bonus);
   deep_copy_body(atom->nlocal, atom->nlocal + atom->nghost);
   // Then: copy the atom i to the position of that ghost atom
   deep_copy_body(i, atom->nlocal);
 
-  atom->tag[atom->nlocal] = atom->nlocal+1;
+  // find_maxid();
+  atom->tag[atom->nlocal] = atom->natoms;
   atom->nlocal++;
+  atom->natoms++;
   nlocal_bonus++;
 
   check_bonus();
@@ -284,6 +301,9 @@ void AtomVecBody::deep_copy_body(int i, int j, int delflag)
   angmom[j][1] = angmom[i][1];
   angmom[j][2] = angmom[i][2];
 
+  // image[j] = ((imageint) IMGMAX << IMG2BITS) |
+  //   ((imageint) IMGMAX << IMGBITS) | IMGMAX;
+
   int ibonus = body[i];
   int jbonus = body[j];
   deep_copy_bonus(ibonus, jbonus);
@@ -294,6 +314,7 @@ void AtomVecBody::deep_copy_body(int i, int j, int delflag)
   {
     atom->nlocal--;
   }
+
 }
 
 /* ----------------------------------------------------------------------

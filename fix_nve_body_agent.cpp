@@ -39,8 +39,12 @@ using namespace FixConst;
 
 FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp, narg, arg)
 {
-  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14 && narg!= 16 && narg!= 18)
+  if (narg != 3 && narg != 6 && narg != 8 && narg != 10 && narg != 12 && narg!= 14 && narg!= 16 && narg!= 18 && narg!= 20)
     error->all(FLERR, "Invalid fix nve/body/agent command");
+
+  // Some unsuccessful try for hacking the hash remapping error after inserting new particle
+  // force_reneighbor = 1;
+  // next_reneighbor = update->ntimestep + 1;
 
   // looking for args for body growth and proliferation
   // default values are 0, if 0 is set, proliferation and growth will be skiped
@@ -48,7 +52,8 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
   L_critical = 0;
   del_height = 1e6;
   frozen_radius = 0;
-  m_radial = 0.1;
+  m_radial = 0;
+  mutant_fraction = 0;
   for (int i = 0; i < narg - 1; i++)
   {
     if (strcmp(arg[i], "grow") == 0)
@@ -80,6 +85,10 @@ FixNVEBodyAgent::FixNVEBodyAgent(LAMMPS *lmp, int narg, char **arg) : FixNVE(lmp
     {
       m_radial = force->numeric(FLERR, arg[i + 1]);
     }
+    if (strcmp(arg[i], "mutant") == 0)
+    {
+      mutant_fraction = force->numeric(FLERR, arg[i + 1]);
+    }
   }
 
   nsteps = 0;
@@ -108,7 +117,7 @@ void FixNVEBodyAgent::init()
 
   for (int i = 0; i < nlocal; i++)
   {
-    list_growth_rate[i] = distribution(generator); // initiate all rates, including gel particles
+    list_growth_rate[i] = distribution(generator); // initiate all rates, including gel particles (for simplicity)
     if (mask[i] & groupbit)
     {
       if (body[i] < 0)
@@ -131,9 +140,84 @@ int FixNVEBodyAgent::setmask()
   mask |= INITIAL_INTEGRATE_RESPA;
   mask |= FINAL_INTEGRATE_RESPA;
 
+  // Added by changhao
   mask |= PRE_EXCHANGE;
 
   return mask;
+}
+
+/* ----------------------------------------------------------------------
+  Apply tensile stretch to a single element
+  For benchmarking of single-element test
+---------------------------------------------------------------------- */
+
+void FixNVEBodyAgent::deform_single_element_tensile(double element[][2], double* r1, double* r2, double* c1, double* c2, double dl)
+{
+  // r1 and r2 are coordinates of contact points in reference frame [-1, 1]x[-1, 1]
+  // coordinate of a single element
+  element[0][0] = element[0][0] + dl;
+  element[3][0] = element[3][0] + dl;
+
+  auto n1 = element[0], n2 = element[1], n3 = element[2], n4 = element[3];
+  c1[0] = 1.0/4 * (1 + r1[0]) * (1 + r1[1]) * n1[0] + 1.0/4 * (1 - r1[0]) * (1 + r1[1]) * n2[0] +
+          1.0/4 * (1 - r1[0]) * (1 - r1[1]) * n3[0] + 1.0/4 * (1 + r1[0]) * (1 - r1[1]) * n4[0];
+  c1[1] = 1.0/4 * (1 + r1[0]) * (1 + r1[1]) * n1[1] + 1.0/4 * (1 - r1[0]) * (1 + r1[1]) * n2[1] +
+          1.0/4 * (1 - r1[0]) * (1 - r1[1]) * n3[1] + 1.0/4 * (1 + r1[0]) * (1 - r1[1]) * n4[1];
+
+  c2[0] = 1.0/4 * (1 + r2[0]) * (1 + r2[1]) * n1[0] + 1.0/4 * (1 - r2[0]) * (1 + r2[1]) * n2[0] +
+          1.0/4 * (1 - r2[0]) * (1 - r2[1]) * n3[0] + 1.0/4 * (1 + r2[0]) * (1 - r2[1]) * n4[0];
+  c2[1] = 1.0/4 * (1 + r2[0]) * (1 + r2[1]) * n1[1] + 1.0/4 * (1 - r2[0]) * (1 + r2[1]) * n2[1] +
+          1.0/4 * (1 - r2[0]) * (1 - r2[1]) * n3[1] + 1.0/4 * (1 + r2[0]) * (1 - r2[1]) * n4[1];
+}
+
+/* ----------------------------------------------------------------------
+  Calculate gel-cell adhesion and its torque
+  The torque is obtained by two-point method
+---------------------------------------------------------------------- */
+
+void FixNVEBodyAgent::apply_gel_cell_adhesion(double* f, double *torque, double* r1, double* r2, double* c1, double* c2)
+{
+  double K = 10.0;
+  double rc[2] = {0.5*(r1[0]+r2[0]), 0.5*(r1[1]+r2[1])};
+  double cc[2] = {0.5*(c1[0]+c2[0]), 0.5*(c1[1]+c2[1])};
+  double d1[2] = {(c1[0]-r1[0]), (c1[1]-r1[1])};
+  double d2[2] = {(c2[0]-r2[0]), (c2[1]-r2[1])};
+  double d_rc_cc = sqrt(pow(rc[0] - cc[0], 2) + pow(rc[1] - cc[1], 2));
+  double dd1 = sqrt(pow(d1[0], 2) + pow(d1[1], 2));
+  double dd2 = sqrt(pow(d2[0], 2) + pow(d2[1], 2));
+
+  for (int i = 0; i < 2; i++)
+  {
+    f[i] += K * (cc[i] - rc[i]);
+  }
+  double dtor = -cross(K*(c1[0]-r1[0]), K*(c1[1]-r1[1]), 0, 0.5*(r1[0]-r2[0]), 0.5*(r1[1]-r2[1]), 0, 2) +
+                -cross(K*(c2[0]-r2[0]), K*(c2[1]-r2[1]), 0, 0.5*(r2[0]-r1[0]), 0.5*(r2[1]-r1[1]), 0, 2);
+  torque[2] += dtor;
+  printf("dtor = %f\n", dtor);
+
+}
+
+/* ----------------------------------------------------------------------
+  Apply hypothetical confinements with H*sin(1/R*sqrt(x^2+y^2)) - z = 0 shape
+  R is the intercept on x-y plane, H is the intercept on z axis
+---------------------------------------------------------------------- */
+
+void FixNVEBodyAgent::apply_hypothetical_confinements(int ibody, double R, double H)
+{
+  double *boxlo = domain->boxlo;
+  double *boxhi = domain->boxhi;
+  double center[3] = {(boxlo[0]+boxhi[0])/2, (boxlo[1]+boxhi[1])/2, 0};
+  double *x = atom->x[ibody];
+  AtomVecBody::Bonus *bonus = avec->bonus;
+  int *body = atom->body;
+  double **torque = atom->torque;
+
+  // surf_value > 0: the body in under the surface
+  double surf_value = H * sin(1/R * sqrt(x[0]*x[0] + x[1]*x[1])) - x[2];
+  if (surf_value)
+  {
+
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -182,7 +266,41 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
       // add_noise(v[i], omega, noise_level);
       add_noise(f[i], torque[i], noise_level);
 
-      if (nsteps > 3e5) radial_moment(i, m_radial);
+      if (nsteps > 3.5e5) radial_moment(i, m_radial);
+
+      // calculate coordinates of two ends in lab frame
+
+      // double *p = bonus[body[i]].dvalue;
+      // double temp[6];
+      // double L = length(p);    // length of the rod
+      // double r = radius(p, 2); // rounded radius of the rod
+      // for (int j = 0; j < 6; j++)
+      //   temp[j] = bonus[body[i]].dvalue[j] * (L / 2 + r) / L;
+      // double cc[6];
+      // body2space(temp, bonus[body[i]].quat, cc);
+      // for (int j = 0; j < 3; j++) {
+      //   cc[j] += x[i][j];
+      //   cc[j+3] += x[i][j];
+      // }
+      // double *pp1 = cc;
+      // double *pp2 = cc + 3;
+
+      // // benchmark test for stretch elements
+      // double r1[2] = {0, 1.0};
+      // double r2[2] = {0, -1.0};
+      // double *c1 = new double[2];
+      // double *c2 = new double[2];
+      // double dl = 0.01;
+      // deform_single_element_tensile(element, r1, r2, c1, c2, dl);
+      // for (int k = 0; k < 4; k++) {
+      //     printf("Node %d: (%f, %f) \t", k+1, element[k][0], element[k][1]);
+      // }
+      // printf("\n");
+      // printf("Cell %d Point c1: (%f, %f)\t Point c2: (%f, %f)\n", i, c1[0], c1[1], c2[0], c2[1]);
+      // apply_gel_cell_adhesion(f[i], torque[i], pp1, pp2, c1, c2);
+      // printf("Cell %d Point pp1: (%f, %f)\t Point pp2: (%f, %f)\n",i, pp1[0], pp1[1], pp2[0], pp2[1]);
+
+      // update velocity by a full step
 
       v[i][0] += dtfm * f[i][0];
       v[i][1] += dtfm * f[i][1];
@@ -205,6 +323,10 @@ void FixNVEBodyAgent::initial_integrate(int vflag)
 
       MathExtra::richardson(quat, angmom[i], omega, inertia, dtq);
     }
+
+    // if (need_reneighbor()) {
+    //   next_reneighbor = update->ntimestep;
+    // }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -223,7 +345,8 @@ void FixNVEBodyAgent::pre_exchange()
   int i = 0;
   while (i < atom->nlocal)
   {
-    if (atom->mask[i] & groupbit)
+    int nvertices = bonus[body[i]].ivalue[0];
+    if (atom->mask[i] & groupbit && nvertices == 2)
     {
     double vertices[6];
     body2space(bonus[body[i]].dvalue, bonus[body[i]].quat, vertices);
@@ -241,6 +364,18 @@ void FixNVEBodyAgent::pre_exchange()
       type[i] = 1;
     }
 
+    // // change groups for mutant cells
+    // if (nsteps > 2.5e5 && mutant_fraction != 0)
+    //   {
+    //     // if (rand() / double(RAND_MAX) < mutant_fraction)
+    //     if (atom->tag[i] % 10 == 1)
+    //     {
+    //       atom->type[i] = 2;
+    //     } else {
+    //       // atom->type[i] = 1;
+    //     }
+    //   }
+
     if (out_of_z_plane(&icell, del_height))
     {
       printf("Cell %d is out of substrate, it will be removed! \n", i);
@@ -252,6 +387,7 @@ void FixNVEBodyAgent::pre_exchange()
     }
     i++;
   }
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -284,12 +420,12 @@ void FixNVEBodyAgent::final_integrate()
       angmom[i][0] += dtf * torque[i][0];
       angmom[i][1] += dtf * torque[i][1];
       angmom[i][2] += dtf * torque[i][2];
+
     }
 
-  // cells will proliferate if length > critical length
-  proliferate_all_body();
-
   nsteps += 1;
+
+  proliferate_all_body();
 }
 
 /* ----------------------------------------------------------------------
@@ -304,15 +440,22 @@ void FixNVEBodyAgent::apply_damping_force(int ibody, double *omega, double **f, 
   double L = length(bonus[body[ibody]].dvalue);
   double R = radius(bonus[body[ibody]].dvalue, 2);
 
+  // mutant cells has no viscosity (near 0)
+  double temp_nu_0 = nu_0;
+  if (mutant_fraction != 0 && atom->type[ibody] == 2)
+  {
+    temp_nu_0 = nu_0 / 100;
+  }
+
   // adding damping force, applying on mass center
-  f[ibody][0] += -nu_0 * (L+4/3*R) * v[0];
-  f[ibody][1] += -nu_0 * (L+4/3*R) * v[1];
-  f[ibody][2] += -nu_0 * (L+4/3*R) * v[2];
+  f[ibody][0] += -temp_nu_0 * (L+4/3*R) * v[0];
+  f[ibody][1] += -temp_nu_0 * (L+4/3*R) * v[1];
+  f[ibody][2] += -temp_nu_0 * (L+4/3*R) * v[2];
 
   // adding damping moment
-  torque[ibody][0] += -1.0 / 6.0 * nu_0 * omega[0] * pow(L+4/3*R, 3);
-  torque[ibody][1] += -1.0 / 6.0 * nu_0 * omega[1] * pow(L+4/3*R, 3);
-  torque[ibody][2] += -1.0 / 6.0 * nu_0 * omega[2] * pow(L+4/3*R, 3);
+  torque[ibody][0] += -1.0 / 6.0 * temp_nu_0 * omega[0] * pow(L+4/3*R, 3);
+  torque[ibody][1] += -1.0 / 6.0 * temp_nu_0 * omega[1] * pow(L+4/3*R, 3);
+  torque[ibody][2] += -1.0 / 6.0 * temp_nu_0 * omega[2] * pow(L+4/3*R, 3);
 
   // printf("fx: %f, fy: %f, fz: %f \n", f[ibody][0], f[ibody][1], f[ibody][2]);
 }
@@ -415,6 +558,40 @@ bool FixNVEBodyAgent::out_of_z_plane(Cell* icell, double height)
   return !cell_contact(icell);
 }
 
+bool FixNVEBodyAgent::need_reneighbor()
+{
+  AtomVecBody::Bonus *bonus = avec->bonus;
+  int *body = atom->body;
+  double **x = atom->x;
+  double **angmom = atom->angmom;
+  double *rmass = atom->rmass;
+  int *mask = atom->mask;
+  int nlocal = atom->nlocal;
+  if (igroup == atom->firstgroup)
+    nlocal = atom->nfirst;
+
+  // loop to see if cells will proliferate
+
+  if (L_critical != 0)
+  {
+    for (int i = 0; i < nlocal; i++)
+    {
+      int nvertices = bonus[body[i]].ivalue[0];
+      if ((mask[i] & groupbit) && (nvertices == 2))
+      {
+        double *p = bonus[body[i]].dvalue;
+        double L = length(p);    // length of the rod
+        double r = radius(p, 2); // rounded radius of the rod
+        if (L >= L_critical)
+        {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /* ----------------------------------------------------------------------
   return the rotational inertia of the body (unfinished)
 ---------------------------------------------------------------------- */
@@ -438,6 +615,10 @@ void FixNVEBodyAgent::radial_moment(int ibody, double M)
   int *body = atom->body;
   double **torque = atom->torque;
 
+  double rsq = pow(x[0]-center[0], 2) + pow(x[1] - center[1], 2);
+  double M_temp = M;
+  if (sqrt(rsq) < frozen_radius) M_temp = 0;
+
   double L = length(bonus[body[ibody]].dvalue);
   double temp[6];
   for (int j = 0; j < 6; j++)
@@ -455,7 +636,7 @@ void FixNVEBodyAgent::radial_moment(int ibody, double M)
   if (r_n_dot < 0) {nx = -nx; ny = -ny; nz = -nz;}
 
   double rr = sqrt(xvec[0]*xvec[0] +  xvec[1]*xvec[1]);
-  double mz = M * cross(nx, ny, 0, xvec[0], xvec[1], 0, 2) / (rr*rr);
+  double mz = M_temp * cross(nx, ny, 0, xvec[0], xvec[1], 0, 2)  / (rr) * (700-(rr-25)*(rr-25));
   torque[ibody][2] += mz;
 
   // if (nsteps % 50000 == 0) printf("mz = %f", mz);
@@ -505,7 +686,8 @@ void FixNVEBodyAgent::grow_all_body(double given_growth_ratio)
       if ((mask[i] & groupbit) && (nvertices == 2))
       {
         double actual_rate = list_growth_rate[i];
-        if (frozen_radius > 0 && freeze(i, frozen_radius) && nsteps > 3e5) {actual_rate = 0; n_freeze += 1;}
+        if (frozen_radius > 0 && freeze(i, frozen_radius) && nsteps > 3.5e5) {actual_rate = 0; n_freeze += 1;}
+        // if (freeze(i, 100) && nsteps > 4.0e5) {actual_rate = 0; n_freeze += 1; m_radial = 0;}
         grow_single_body(i, actual_rate);
       }
     }
@@ -606,6 +788,7 @@ void FixNVEBodyAgent::proliferate_all_body()
           if (new_rate > growth_rate + 3*standard_dev) new_rate = growth_rate + 3*standard_dev;
           if (new_rate < growth_rate - 3*standard_dev) new_rate = growth_rate - 3*standard_dev;
           list_growth_rate[new_body_index] = new_rate;
+
         }
       }
     }

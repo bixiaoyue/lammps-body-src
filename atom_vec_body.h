@@ -105,6 +105,7 @@ class AtomVecBody : public AtomVec {
   void deep_copy_bonus(int ibonus, int jbonus);
   void check_pools();
   void check_bonus();
+  void find_maxid();
 
  private:
   tagint *tag;
@@ -117,6 +118,7 @@ class AtomVecBody : public AtomVec {
   int *body;
 
   int nlocal_bonus,nghost_bonus,nmax_bonus;
+  tagint maxtag_all;
   int intdoubleratio;       // sizeof(double) / sizeof(int)
 
   MyPoolChunk<int> *icp;

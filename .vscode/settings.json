@@ -53,7 +53,9 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "main.C": "cpp",
+        "bitset": "cpp"
     },
     "C_Cpp.dimInactiveRegions": false,
     "python.pythonPath": "/Users/lichanghao/miniconda3/bin/python"
